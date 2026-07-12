@@ -1,0 +1,90 @@
+[
+  {
+    "code": "anthracnose_disease",
+    "name": "Anthracnose",
+    "affected_part": "leaf",
+    "severity": "mild, moderate, severe",
+    "description": "Brown to black sunken lesions on leaves, stems, and fruit. Spots often have concentric rings with yellow halos. Caused by Colletotrichum spp. High humidity promotes spread.",
+    "recommendation": "Apply copper-based fungicides (Copper oxychloride 0.3%). Remove infected plant parts. Improve air circulation through pruning. Spray every 7-14 days in wet season."
+  },
+  {
+    "code": "canker_disease",
+    "name": "Canker",
+    "affected_part": "stem",
+    "severity": "mild, moderate, severe, critical",
+    "description": "Dark water-soaked lesions on stems and branches that become sunken and cracked. Gum exudation from cankers. Bark splits and peels. Branch dieback in severe cases.",
+    "recommendation": "Scrape infected bark and apply copper paste. Inject streptomycin for bacterial canker. Prune affected branches 15-20 cm below symptoms. Disinfect tools between cuts."
+  },
+  {
+    "code": "fruit_rot",
+    "name": "Fruit Rot",
+    "affected_part": "fruit",
+    "severity": "moderate, severe, critical",
+    "description": "Water-soaked spots on fruit that rapidly enlarge into soft brown decay. White, gray, or green mold growth. Foul odor. Premature fruit drop. Internal flesh becomes mushy.",
+    "recommendation": "Remove infected fruits from tree and ground. Apply Mancozeb or Metalaxyl. Bag developing fruits. Improve orchard sanitation. Reduce humidity through pruning."
+  },
+  {
+    "code": "mealybug_infestation",
+    "name": "Mealybug",
+    "affected_part": "leaf",
+    "severity": "mild, moderate, severe",
+    "description": "White cottony masses on leaves, stems, and young shoots. Stunted growth and leaf yellowing. Honeydew secretion leads to sooty mold. Ants farm mealybugs for honeydew.",
+    "recommendation": "Apply systemic insecticides (Imidacloprid, Thiamethoxam) or biological control (Cryptolaemus ladybird beetles). Use neem oil. Control ant populations. Prune heavily infested parts."
+  },
+  {
+    "code": "pink_disease",
+    "name": "Pink Disease",
+    "affected_part": "stem",
+    "severity": "moderate, severe, critical",
+    "description": "Pinkish-white cobweb-like fungal growth on stems and branches. Bark cracks and peels. Branch dieback from tip downward. Caused by Corticium salmonicolor.",
+    "recommendation": "Prune infected branches 30-50 cm below visible signs. Apply fungicide paste (bitertanol, propiconazole). Improve air circulation. Avoid dense planting."
+  },
+  {
+    "code": "sooty_mold",
+    "name": "Sooty Mold",
+    "affected_part": "leaf",
+    "severity": "mild, moderate",
+    "description": "Black soot-like coating on upper leaf surfaces. Fungus grows on honeydew from sucking insects. Reduced photosynthesis. Leaves may yellow and drop.",
+    "recommendation": "Control underlying insect pests. Wash leaves with strong water spray or mild soap. Apply copper-based fungicides. Introduce beneficial insects (ladybirds, lacewings)."
+  },
+  {
+    "code": "stem_blight",
+    "name": "Stem Blight",
+    "affected_part": "stem",
+    "severity": "moderate, severe, critical",
+    "description": "Dark elongated lesions on stems and branches. Rapid wilting above infection. Bark discoloration and cracking. Vascular discoloration under bark. Girdling leads to branch death.",
+    "recommendation": "Prune infected branches 20-30 cm below symptoms. Apply fungicide paste to wounds. Spray Triadimefon or Propiconazole. Improve drainage. Disinfect pruning tools."
+  },
+  {
+    "code": "stem_cracking_gummosis",
+    "name": "Stem Cracking Gummosis",
+    "affected_part": "stem",
+    "severity": "mild, moderate, severe",
+    "description": "Longitudinal cracks on stems and branches with amber to brown gum exudation. Bark separates from wood. Secondary infections common in cracked areas.",
+    "recommendation": "Improve drainage. Apply wound dressing (Bordeaux paste) to cracks. Reduce irrigation in wet season. Apply calcium and boron supplements. Prevent mechanical injury."
+  },
+  {
+    "code": "thrips_disease",
+    "name": "Thrips",
+    "affected_part": "leaf",
+    "severity": "mild, moderate, severe",
+    "description": "Silvery-white streaks and stippling on young leaves. Leaves become distorted, curled, and stunted. Brown scabby patches on leaf undersides. Black fecal spots visible.",
+    "recommendation": "Apply Spinosad, Abamectin, or Imidacloprid. Use yellow sticky traps. Apply neem oil. Introduce predatory mites (Amblyseius). Spray both upper and lower leaf surfaces."
+  },
+  {
+    "code": "yellow_leaf",
+    "name": "Yellow Leaf",
+    "affected_part": "leaf",
+    "severity": "mild, moderate, severe",
+    "description": "Uniform or interveinal yellowing of leaves. Older leaves yellow first (N deficiency). Interveinal chlorosis with green veins (Fe/Mg deficiency). Leaf tips and margins may brown.",
+    "recommendation": "Apply balanced NPK fertilizer based on soil test. Foliar spray with micronutrients (Fe, Mg, Zn, Mn). Correct soil pH to 5.5-6.5. Improve drainage. Add organic matter."
+  },
+  {
+    "code": "healthy",
+    "name": "Healthy",
+    "affected_part": null,
+    "severity": "none",
+    "description": "No disease detected. Tree is in healthy condition with no visible symptoms.",
+    "recommendation": "Continue regular monitoring and preventive care. Maintain good orchard hygiene and irrigation practices."
+  }
+]
