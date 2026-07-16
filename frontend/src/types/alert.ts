@@ -1,21 +1,19 @@
 export interface Alert {
-  _id: string; // MongoDB document identifier
+  _id: string;
   farm_id: string;
   tree_id?: string;
-  title: string;
-  content: string;
-  status: string;
-  alert_type?: string;
-  priority?: string;
+  alert_type: string;
+  priority: string;
+  date: string;
   created_at: string;
 }
 
 export interface CreateAlertRequest {
   farm_id: string;
   tree_id?: string;
-  title: string;
-  content: string;
-  status: string;
+  alert_type: string;
+  priority: string;
+  date: string;
 }
 
 export type UpdateAlertRequest = Partial<CreateAlertRequest>;

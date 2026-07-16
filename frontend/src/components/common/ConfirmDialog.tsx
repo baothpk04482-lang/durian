@@ -14,8 +14,8 @@ interface ConfirmDialogProps {
 export default function ConfirmDialog({
   title,
   description,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText = "Xác nhận",
+  cancelText = "Hủy",
   open,
   onConfirm,
   onCancel,

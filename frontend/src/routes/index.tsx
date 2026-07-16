@@ -14,6 +14,7 @@ import DiseaseHistoryPage from "@/pages/disease-history/DiseaseHistory";
 import AlertsPage from "@/pages/alerts/Alerts";
 import DiseasesPage from "@/pages/diseases/Diseases";
 import SettingsPage from "@/pages/settings/Settings";
+import ProtectedRoute from "./ProtectedRoute";
 
 export const router = createBrowserRouter([
   {
@@ -26,10 +27,18 @@ export const router = createBrowserRouter([
   },
   {
     path: "/",
-    element: <AppLayout />,
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
+        element: <Navigate to="/dashboard" replace />,
+      },
+      {
+        path: "dashboard",
         element: <DashboardPage />,
       },
       {
@@ -80,6 +89,6 @@ export const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/" replace />,
+    element: <Navigate to="/login" replace />,
   },
 ]);

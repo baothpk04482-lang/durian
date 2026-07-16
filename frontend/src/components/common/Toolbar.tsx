@@ -9,7 +9,7 @@ interface ToolbarProps {
   children?: React.ReactNode;
 }
 
-export default function Toolbar({ title, searchValue, onSearchChange, searchPlaceholder = "Search...", action, children }: ToolbarProps) {
+export default function Toolbar({ title, searchValue, onSearchChange, searchPlaceholder = "Tìm kiếm...", action, children }: ToolbarProps) {
   return (
     <div className="bg-white border border-gray-100 rounded-[18px] p-3 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
       <div className="flex flex-col lg:flex-row lg:items-center gap-3">

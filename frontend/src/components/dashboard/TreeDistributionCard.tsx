@@ -22,7 +22,7 @@ function EmptyState() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       </div>
-      <p className="text-[13px] font-semibold text-gray-400">No Data Available</p>
+      <p className="text-[13px] font-semibold text-gray-400">Không có dữ liệu</p>
     </div>
   );
 }
@@ -41,7 +41,7 @@ export default function TreeDistributionCard({ data, total }: FarmHealthCardProp
           <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: d.color }} />
           <span className="text-[13px] font-bold text-gray-800">{d.name}</span>
         </div>
-        <span className="text-[12px] text-gray-500 font-medium">{d.value.toLocaleString()} Trees</span>
+        <span className="text-[12px] text-gray-500 font-medium">{d.value.toLocaleString()} Cây</span>
         <span className="text-[12px] text-gray-400 ml-1">({pct}%)</span>
       </div>
     );
@@ -51,9 +51,9 @@ export default function TreeDistributionCard({ data, total }: FarmHealthCardProp
     <Card className="flex flex-col" style={{ height: "100%" }}>
       <SectionTitle
         icon={<Heart className="w-5 h-5 text-emerald-600" />}
-        title="Farm Health Distribution"
+        title="Phân bố tình trạng cây"
         size="section"
-        subtitle="How healthy is my farm?"
+        subtitle="Thống kê tình trạng toàn bộ cây"
       />
       {!hasData ? (
         <EmptyState />
@@ -84,7 +84,7 @@ export default function TreeDistributionCard({ data, total }: FarmHealthCardProp
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center" style={{ marginTop: "-8px" }}>
                 <span className="text-[20px] font-black text-gray-900 block leading-none">{total.toLocaleString()}</span>
-                <span className="text-[11px] text-gray-500 font-bold block">Total Trees</span>
+                <span className="text-[11px] text-gray-500 font-bold block">Tổng số cây</span>
               </div>
             </div>
           </div>
@@ -96,7 +96,7 @@ export default function TreeDistributionCard({ data, total }: FarmHealthCardProp
                   <div className="w-3.5 h-3.5 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} aria-hidden="true" />
                   <div>
                     <span className="text-[13px] font-bold text-gray-700 block leading-tight">{item.name}</span>
-                    <span className="text-[12px] text-gray-400 font-medium">{item.value.toLocaleString()} trees ({pct}%)</span>
+                    <span className="text-[12px] text-gray-400 font-medium">{item.value.toLocaleString()} cây ({pct}%)</span>
                   </div>
                 </div>
               );

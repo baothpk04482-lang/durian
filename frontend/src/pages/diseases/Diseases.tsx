@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ClipboardList,
-  Building2,
+  TreePine,
   Sprout,
   Grid,
-  Eye,
   Edit2,
   Trash2,
+  Eye,
   Plus
 } from "lucide-react";
 import Toolbar from "../../components/common/Toolbar";
@@ -14,49 +14,44 @@ import StatCard from "../../components/common/StatCard";
 import DataTable from "../../components/common/DataTable";
 import Pagination from "../../components/common/Pagination";
 import DrawerForm from "../../components/common/DrawerForm";
+import RecordDetailDrawer from "../../components/common/RecordDetailDrawer";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import StatusChip from "../../components/common/StatusChip";
 import { diseaseService } from "../../services/disease.service";
 import type { Disease } from "../../types/disease";
+import { formatDateTime } from "../../utils/dateFormatter";
+import { vi, PART_VI } from "../../utils/translate";
 
 export default function DiseasesPage() {
-  // Live API data states
   const [diseases, setDiseases] = useState<Disease[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Server-side pagination metadata
   const [totalDiseases, setTotalDiseases] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Search & Filter local states
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSeverity, setSelectedSeverity] = useState("All");
 
-  // Pagination local states
   const [currentPage, setCurrentPage] = useState(1);
   const perPage = 20;
 
-  // Drawer Form states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [currentDisease, setCurrentDisease] = useState<Disease | null>(null);
   const [formData, setFormData] = useState({
+    code: "",
     name: "",
-    scientific_name: "",
-    category: "Fungal",
-    description: "",
-    symptoms: "",
-    treatment: "",
-    prevention: "",
+    affected_part: "",
     severity: "Mild",
+    description: "",
+    recommendation: "",
   });
 
-  // Delete Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDiseaseId, setSelectedDiseaseId] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"create" | "edit">("create");
+  const [detailRecord, setDetailRecord] = useState<Disease | null>(null);
 
-  // Build query params and fetch diseases from server
   const fetchDiseases = useCallback(() => {
     setLoading(true);
     setError(null);
@@ -75,7 +70,7 @@ export default function DiseasesPage() {
         setTotalPages((data as any).total_pages ?? Math.ceil(((data as any).total ?? arr.length) / perPage));
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to load disease details.";
+        const msg = err instanceof Error ? err.message : "Không thể tải chi tiết bệnh.";
         setError(msg);
       })
       .finally(() => {
@@ -105,7 +100,7 @@ export default function DiseasesPage() {
           setTotalPages((data as any).total_pages ?? Math.ceil(((data as any).total ?? arr.length) / perPage));
         })
         .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : "Failed to load disease details.";
+          const msg = err instanceof Error ? err.message : "Không thể tải chi tiết bệnh.";
           setError(msg);
         })
         .finally(() => {
@@ -118,106 +113,105 @@ export default function DiseasesPage() {
     fetchDiseases();
   }, [currentPage, searchQuery, fetchDiseases]);
 
-  const getCategoryChipVariant = (category: string): "Warning" | "Error" | "Success" | "Info" | "Pending" => {
-    switch (category) {
-      case "Fungal":
-        return "Warning";
-      case "Insect Pest":
+  const getSeverityChipVariant = (severity: string): "Error" | "Warning" | "Info" | "Pending" => {
+    switch (severity) {
+      case "Severe":
         return "Error";
-      case "None":
-        return "Success";
-      case "Bacterial":
+      case "Moderate":
+        return "Warning";
+      case "Mild":
         return "Info";
       default:
         return "Pending";
     }
   };
 
-  // Set form states for Add Disease
+  const parseSeverityTokens = (severity: string | undefined | null): string[] =>
+    typeof severity === "string" ? severity.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+  const SEVERITY_TOKEN_VI: Record<string, string> = {
+    mild: "Nhẹ",
+    moderate: "Trung bình",
+    severe: "Nghiêm trọng",
+    critical: "Rất nghiêm trọng",
+    none: "Không",
+  };
+
+  const translateSeverityToken = (token: string): string =>
+    SEVERITY_TOKEN_VI[token.toLowerCase()] || token;
+
+  const hasSeverity = (severityStr: string, target: string): boolean =>
+    parseSeverityTokens(severityStr).some((t) => t.toLowerCase() === target.toLowerCase());
+
   const handleAddClick = () => {
     setCurrentDisease(null);
     setFormData({
+      code: "",
       name: "",
-      scientific_name: "",
-      category: "Fungal",
-      description: "",
-      symptoms: "",
-      treatment: "",
-      prevention: "",
+      affected_part: "",
       severity: "Mild",
+      description: "",
+      recommendation: "",
     });
+    setDrawerMode("create");
     setIsDrawerOpen(true);
   };
 
-  // Set form states for Edit Disease
   const handleEditClick = (disease: Disease) => {
     setCurrentDisease(disease);
-    const symptomsStr = Array.isArray(disease.symptoms)
-      ? disease.symptoms.join(", ")
-      : disease.symptoms || "";
-
     setFormData({
-      name: disease.name || disease.disease_name || "",
-      scientific_name: disease.scientific_name || disease.common_name || "",
-      category: disease.category,
-      description: disease.description || "",
-      symptoms: symptomsStr,
-      treatment: disease.treatment,
-      prevention: disease.prevention || "",
+      code: disease.code || "",
+      name: disease.name || "",
+      affected_part: disease.affected_part || "",
       severity: disease.severity || "Mild",
+      description: disease.description || "",
+      recommendation: disease.recommendation || "",
     });
+    setDrawerMode("edit");
     setIsDrawerOpen(true);
   };
 
-  // Trigger Save/Update
+  const handleViewClick = (disease: Disease) => {
+    setDetailRecord(disease);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const symptomsArray = formData.symptoms
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const payload = {
+      code: formData.code,
       name: formData.name,
-      scientific_name: formData.scientific_name,
-      category: formData.category,
-      symptoms: symptomsArray,
-      treatment: formData.treatment,
-      prevention: formData.prevention,
+      affected_part: formData.affected_part,
       severity: formData.severity,
       description: formData.description,
+      recommendation: formData.recommendation,
     };
 
     try {
       if (currentDisease) {
-        // Edit Action
         await diseaseService.put(currentDisease._id, payload);
       } else {
-        // Create Action
         await diseaseService.post(payload);
       }
       setIsDrawerOpen(false);
       fetchDiseases();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error saving disease data.";
+      const msg = err instanceof Error ? err.message : "Lỗi khi lưu dữ liệu bệnh.";
       alert(msg);
     }
   };
 
-  // Handle Delete Click
   const handleDeleteClick = (id: string) => {
     setSelectedDiseaseId(id);
     setIsDialogOpen(true);
   };
 
-  // Trigger Delete API
   const handleDeleteConfirm = async () => {
     if (selectedDiseaseId) {
       try {
         await diseaseService.delete(selectedDiseaseId);
         fetchDiseases();
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Error deleting disease.";
+        const msg = err instanceof Error ? err.message : "Lỗi khi xóa bệnh.";
         alert(msg);
       } finally {
         setIsDialogOpen(false);
@@ -226,106 +220,88 @@ export default function DiseasesPage() {
     }
   };
 
-  // Dynamically resolve filters from API payload
-  const categories = ["All", ...Array.from(new Set(diseases.map((d) => d.category).filter(Boolean)))];
-  const severities = ["All", ...Array.from(new Set(diseases.map((d) => d.severity || "Mild").filter(Boolean)))];
+  const severities = ["All", ...Array.from(new Set(diseases.flatMap((d) => parseSeverityTokens(d.severity))))];
+  const severityLabels: Record<string, string> = {
+    All: "Tất cả",
+    ...SEVERITY_TOKEN_VI,
+  };
 
-  // Client-side filtering for category/severity (unsupported by backend)
   const filteredDiseases = diseases.filter((d) => {
-    const matchesCategory = selectedCategory === "All" || d.category === selectedCategory;
-    const matchesSeverity = selectedSeverity === "All" || (d.severity || "Mild") === selectedSeverity;
-    return matchesCategory && matchesSeverity;
+    return selectedSeverity === "All" || hasSeverity(d.severity, selectedSeverity);
   });
 
-  // Dynamic statistics aggregations
-  const fungalPathogens = filteredDiseases.filter((d) => d.category === "Fungal").length;
-  const insectPests = filteredDiseases.filter((d) => d.category === "Insect Pest").length;
+  const severeCount = filteredDiseases.filter((d) => hasSeverity(d.severity, "severe")).length;
+  const moderateCount = filteredDiseases.filter((d) => hasSeverity(d.severity, "moderate")).length;
 
-  const categoriesCount = filteredDiseases.reduce((acc, d) => {
-    acc[d.category] = (acc[d.category] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  const commonPathogen = Object.keys(categoriesCount).reduce(
-    (a, b) => (categoriesCount[a] > categoriesCount[b] ? a : b),
-    "N/A"
-  );
-
-  // Column mapping
   const columns = [
-    { key: "disease_name", label: "Disease Name", width: "1fr" },
-    { key: "common_name", label: "Common Name", width: "1fr" },
-    { key: "category", label: "Category", width: "130px" },
-    { key: "description", label: "Description", width: "1.5fr" },
-    { key: "symptoms", label: "Symptoms", width: "1.5fr" },
-    { key: "treatment", label: "Treatment", width: "1.5fr" },
-    { key: "created_at", label: "Created At", width: "140px" },
-    { key: "actions", label: "Actions", width: "130px", className: "text-right" },
+    { key: "code", label: "Mã bệnh", width: "120px" },
+    { key: "name", label: "Tên bệnh", width: "1fr" },
+    { key: "affected_part", label: "Bộ phận ảnh hưởng", width: "1fr" },
+    { key: "severity", label: "Mức độ", width: "110px" },
+    { key: "description", label: "Mô tả", width: "1.5fr" },
+    { key: "recommendation", label: "Phương pháp xử lý", width: "1.5fr" },
+    { key: "created_at", label: "Ngày tạo", width: "140px" },
+    { key: "actions", label: "Thao tác", width: "130px", className: "text-right" },
   ];
 
-  // Map database elements to components representation
-  const tableRows = filteredDiseases.map((row) => {
-    const symptomsStr = Array.isArray(row.symptoms) ? row.symptoms.join(", ") : row.symptoms || "";
+  const tableRows = filteredDiseases.map((row) => ({
+    code: <span className="font-semibold text-gray-900">{row.code}</span>,
+    name: <span className="text-gray-700">{row.name}</span>,
+    affected_part: <span className="text-gray-600">{(row.affected_part ?? "").split(",").map((t: string) => vi(PART_VI, t.trim()) || t.trim()).filter(Boolean).join(", ") || "—"}</span>,
+    severity: (
+      <span className="flex flex-wrap gap-1">
+        {parseSeverityTokens(row.severity).map((token) => (
+          <StatusChip
+            key={token}
+            label={translateSeverityToken(token)}
+            variant={getSeverityChipVariant(token)}
+          />
+        ))}
+      </span>
+    ),
+    description: (
+      <span className="text-gray-500 truncate max-w-[150px] block" title={row.description || ""}>
+        {row.description || "—"}
+      </span>
+    ),
+    recommendation: (
+      <span className="text-gray-500 truncate max-w-[150px] block" title={row.recommendation}>
+        {row.recommendation}
+      </span>
+    ),
+    created_at: <span className="text-gray-500">{formatDateTime(row.created_at)}</span>,
+    actions: (
+      <div className="flex items-center justify-end gap-2 pr-6">
+        <button
+          onClick={() => handleViewClick(row)}
+          type="button"
+          title="Xem"
+          className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-[#1E8449] hover:border-[#1E8449]/20 transition-all"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleEditClick(row)}
+          type="button"
+          aria-label="Chỉnh sửa bệnh"
+          className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-blue-600 hover:border-blue-200 transition-all"
+          title="Chỉnh sửa"
+        >
+          <Edit2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleDeleteClick(row._id)}
+          type="button"
+          aria-label="Xóa bệnh"
+          className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-red-600 hover:border-red-200 transition-all"
+          title="Xóa"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    ),
+  }));
 
-    return {
-      disease_name: <span className="font-semibold text-gray-900">{row.name || row.disease_name}</span>,
-      common_name: <span className="text-gray-700 font-semibold">{row.scientific_name || row.common_name}</span>,
-      category: (
-        <StatusChip
-          label={row.category}
-          variant={getCategoryChipVariant(row.category)}
-        />
-      ),
-      description: (
-        <span className="text-gray-500 truncate max-w-[150px] block" title={row.description || ""}>
-          {row.description || "N/A"}
-        </span>
-      ),
-      symptoms: (
-        <span className="text-gray-500 truncate max-w-[150px] block" title={symptomsStr}>
-          {symptomsStr}
-        </span>
-      ),
-      treatment: (
-        <span className="text-gray-500 truncate max-w-[150px] block" title={row.treatment}>
-          {row.treatment}
-        </span>
-      ),
-      created_at: <span className="text-gray-500">{row.created_at || "N/A"}</span>,
-      actions: (
-        <div className="flex items-center justify-end gap-2 pr-6">
-          <button
-            onClick={() => {}}
-            type="button"
-            aria-label="View disease"
-            className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-[#1E8449] hover:border-[#1E8449]/20 transition-all"
-            title="View"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleEditClick(row)}
-            type="button"
-            aria-label="Edit disease"
-            className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-blue-600 hover:border-blue-200 transition-all"
-            title="Edit"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDeleteClick(row._id)}
-            type="button"
-            aria-label="Delete disease"
-            className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-red-600 hover:border-red-200 transition-all"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-    };
-  });
-
-  // Drawer Footer layout
   const drawerFooter = (
     <div className="flex items-center justify-end gap-3">
       <button
@@ -333,62 +309,53 @@ export default function DiseasesPage() {
         type="button"
         className="px-4 py-2 border border-gray-200 rounded-[12px] text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-all"
       >
-        Cancel
+        Hủy
       </button>
       <button
         onClick={handleSave}
         type="button"
         className="px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-[14px] font-semibold hover:bg-emerald-700 transition-all"
       >
-        Save
+        Lưu
       </button>
     </div>
   );
 
   const emptyState = error ? (
     <div className="text-red-600 text-sm font-semibold py-6 text-center">
-      {error}. Please try again later.
+      {error}. Vui lòng thử lại sau.
     </div>
   ) : undefined;
 
   return (
     <div className="flex flex-col h-full space-y-4">
-      {/* 1. Toolbar with Search & Filters */}
       <Toolbar
-        title="Diseases"
+        title="Bệnh"
         searchValue={searchQuery}
         onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-        searchPlaceholder="Search disease..."
+        searchPlaceholder="Tìm bệnh..."
         action={
           <button onClick={handleAddClick} type="button" className="inline-flex items-center gap-2 px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-all focus:outline-none">
             <Plus className="w-4 h-4" />
-            <span>Add Disease</span>
+            <span>Thêm bệnh</span>
           </button>
         }
       >
         <div className="flex items-center gap-3">
-          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Category:</span>
-          <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }} aria-label="Filter by category" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
-            {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
-          </select>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Severity:</span>
-          <select value={selectedSeverity} onChange={(e) => { setSelectedSeverity(e.target.value); setCurrentPage(1); }} aria-label="Filter by severity" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
-            {severities.map((s) => (<option key={s} value={s}>{s}</option>))}
+          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Mức độ:</span>
+          <select value={selectedSeverity} onChange={(e) => { setSelectedSeverity(e.target.value); setCurrentPage(1); }} aria-label="Lọc theo mức độ" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
+            {severities.map((s) => (<option key={s} value={s}>{severityLabels[s] || s}</option>))}
           </select>
         </div>
       </Toolbar>
 
-      {/* 3. Aggregated Stat Summary Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard compact title="Total Pathogens" value={loading ? "..." : totalDiseases} icon={ClipboardList} />
-        <StatCard compact title="Fungal Pathogens" value={loading ? "..." : fungalPathogens} icon={Sprout} color="text-blue-600" />
-        <StatCard compact title="Insect Pests" value={loading ? "..." : insectPests} icon={Building2} color="text-amber-600" />
-        <StatCard compact title="Common Pathogen" value={loading ? "..." : commonPathogen} icon={Grid} color="text-indigo-600" />
+        <StatCard compact title="Tổng bệnh" value={loading ? "..." : totalDiseases} icon={ClipboardList} />
+        <StatCard compact title="Nghiêm trọng" value={loading ? "..." : severeCount} icon={Sprout} color="text-blue-600" />
+        <StatCard compact title="Trung bình" value={loading ? "..." : moderateCount} icon={TreePine} color="text-amber-600" />
+        <StatCard compact title="Bệnh hiện có" value={loading ? "..." : filteredDiseases.length} icon={Grid} color="text-indigo-600" />
       </div>
 
-      {/* 4. Data Table Grid Layout */}
       <DataTable
         columns={columns}
         rows={tableRows}
@@ -396,7 +363,6 @@ export default function DiseasesPage() {
         emptyState={emptyState}
       />
 
-      {/* 5. Pagination Control Footer */}
       <Pagination
         page={currentPage}
         totalPages={totalPages}
@@ -405,9 +371,8 @@ export default function DiseasesPage() {
         onChange={(p) => setCurrentPage(p)}
       />
 
-      {/* 6. Slide-Out Drawer Form Container */}
       <DrawerForm
-        title={currentDisease ? "Edit Disease" : "Add Disease"}
+        title={drawerMode === "edit" ? "Chỉnh sửa bệnh" : "Thêm bệnh"}
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         footer={drawerFooter}
@@ -415,117 +380,85 @@ export default function DiseasesPage() {
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Disease Name
+              Mã bệnh
+            </label>
+            <input
+              type="text"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              placeholder="VD: DISEASE-001"
+              aria-label="Mã bệnh"
+              className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+              Tên bệnh
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. Leaf Spot"
-              aria-label="Disease Name"
+              placeholder="VD: Đốm lá"
+              aria-label="Tên bệnh"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
               required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Scientific / Common Name
+              Bộ phận ảnh hưởng
             </label>
             <input
               type="text"
-              value={formData.scientific_name}
-              onChange={(e) => setFormData({ ...formData, scientific_name: e.target.value })}
-              placeholder="e.g. Cercospora durionis"
-              aria-label="Common Name"
+              value={formData.affected_part}
+              onChange={(e) => setFormData({ ...formData, affected_part: e.target.value })}
+              placeholder="VD: Lá, Thân, Rễ"
+              aria-label="Bộ phận ảnh hưởng"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
               required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Category
-            </label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              aria-label="Category"
-              className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none"
-              required
-            >
-              <option value="Fungal">Fungal</option>
-              <option value="Bacterial">Bacterial</option>
-              <option value="Insect Pest">Insect Pest</option>
-              <option value="None">None</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Severity Level
+              Mức độ nghiêm trọng
             </label>
             <select
               value={formData.severity}
               onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-              aria-label="Severity Level"
+              aria-label="Mức độ nghiêm trọng"
               className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none"
               required
             >
-              <option value="Mild">Mild</option>
-              <option value="Moderate">Moderate</option>
-              <option value="Severe">Severe</option>
+              <option value="Mild">Nhẹ</option>
+              <option value="Moderate">Trung bình</option>
+              <option value="Severe">Nghiêm trọng</option>
             </select>
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Description
+              Mô tả
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
-              placeholder="e.g. Fungal infection causing spots..."
-              aria-label="Description"
+              placeholder="VD: Nhiễm trùng nấm gây ra các đốm..."
+              aria-label="Mô tả"
               className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] focus:outline-none resize-none"
-              required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Symptoms (Comma-separated list)
+              Phương pháp xử lý
             </label>
             <textarea
-              value={formData.symptoms}
-              onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
+              value={formData.recommendation}
+              onChange={(e) => setFormData({ ...formData, recommendation: e.target.value })}
               rows={3}
-              placeholder="e.g. Circular spots, Yellow halos, Leaf drop"
-              aria-label="Symptoms"
-              className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] focus:outline-none resize-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Treatment Recommendations
-            </label>
-            <textarea
-              value={formData.treatment}
-              onChange={(e) => setFormData({ ...formData, treatment: e.target.value })}
-              rows={3}
-              placeholder="e.g. Spray copper fungicide every 14 days..."
-              aria-label="Treatment"
-              className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] focus:outline-none resize-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Prevention Protocols
-            </label>
-            <textarea
-              value={formData.prevention}
-              onChange={(e) => setFormData({ ...formData, prevention: e.target.value })}
-              rows={3}
-              placeholder="e.g. Maintain proper pruning, avoid overhead irrigation..."
-              aria-label="Prevention Protocols"
+              placeholder="VD: Phun thuốc diệt nấm đồng mỗi 14 ngày..."
+              aria-label="Phương pháp xử lý"
               className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] focus:outline-none resize-none"
               required
             />
@@ -533,10 +466,56 @@ export default function DiseasesPage() {
         </form>
       </DrawerForm>
 
-      {/* 7. Dialog Confirmation Modal */}
+      <RecordDetailDrawer
+        title="Chi tiết bệnh"
+        open={!!detailRecord}
+        onClose={() => setDetailRecord(null)}
+        sections={
+          detailRecord
+            ? [
+                {
+                  title: "Thông tin chung",
+                  fields: [
+                    { label: "Mã bệnh", value: detailRecord.code },
+                    { label: "Tên bệnh", value: detailRecord.name },
+                    { label: "Bộ phận ảnh hưởng", value: (detailRecord.affected_part ?? "").split(",").map((t: string) => vi(PART_VI, t.trim()) || t.trim()).filter(Boolean).join(", ") || "—" },
+                    {
+                      label: "Mức độ",
+                      value: (
+                        <span className="flex flex-wrap gap-1">
+                          {parseSeverityTokens(detailRecord.severity).map((token) => (
+                            <StatusChip
+                              key={token}
+                              label={translateSeverityToken(token)}
+                              variant={getSeverityChipVariant(token)}
+                            />
+                          ))}
+                        </span>
+                      ),
+                    },
+                  ],
+                },
+                {
+                  title: "Mô tả & Xử lý",
+                  fields: [
+                    { label: "Mô tả", value: detailRecord.description || "—" },
+                    { label: "Phương pháp xử lý", value: detailRecord.recommendation },
+                  ],
+                },
+                {
+                  title: "Thời gian",
+                  fields: [
+                    { label: "Ngày tạo", value: formatDateTime(detailRecord.created_at) },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
+
       <ConfirmDialog
-        title="Delete Disease"
-        description="Are you sure you want to delete this disease?"
+        title="Xóa bệnh"
+        description="Bạn có chắc chắn muốn xóa bệnh này?"
         open={isDialogOpen}
         onConfirm={handleDeleteConfirm}
         onCancel={() => {

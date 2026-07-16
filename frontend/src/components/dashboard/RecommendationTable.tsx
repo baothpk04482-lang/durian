@@ -22,18 +22,18 @@ export default function RecommendationTable({ data }: RecommendationTableProps) 
   return (
     <div className="mb-3">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px]">Priority Trees</span>
-        <span className="text-[10px] text-gray-400">{data.length} items</span>
+        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px]">Cây ưu tiên</span>
+        <span className="text-[10px] text-gray-400">{data.length} mục</span>
       </div>
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-gray-200">
             <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5 w-5">#</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Tree ID</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Variety</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Age</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Risk Score</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Status</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Mã cây</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Giống</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Tuổi</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Điểm rủi ro</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-1.5">Trạng thái</th>
           </tr>
         </thead>
         <tbody>

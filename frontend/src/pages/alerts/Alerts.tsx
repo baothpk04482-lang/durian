@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   ClipboardList,
   Building2,
-  Sprout,
-  Grid,
-  Eye,
+  TreePine,
+  Bug,
   Edit2,
   Trash2,
+  Eye,
   Plus
 } from "lucide-react";
 import Toolbar from "../../components/common/Toolbar";
@@ -14,51 +14,49 @@ import StatCard from "../../components/common/StatCard";
 import DataTable from "../../components/common/DataTable";
 import Pagination from "../../components/common/Pagination";
 import DrawerForm from "../../components/common/DrawerForm";
+import RecordDetailDrawer from "../../components/common/RecordDetailDrawer";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import StatusChip from "../../components/common/StatusChip";
+import { loadAllPages } from "../../utils/loadAllPages";
 import { alertService } from "../../services/alert.service";
 import { farmService } from "../../services/farm.service";
 import { treeService } from "../../services/tree.service";
 import type { Alert } from "../../types/alert";
 import type { Farm } from "../../types/farm";
 import type { Tree } from "../../types/tree";
+import { formatDateTime } from "../../utils/dateFormatter";
+import { vi, ALERT_TYPE_VI, PRIORITY_VI } from "../../utils/translate";
 
 export default function AlertsPage() {
-  // Live API data states
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [trees, setTrees] = useState<Tree[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Server-side pagination metadata
   const [totalAlerts, setTotalAlerts] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Search & Filter local states
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFarmId, setSelectedFarmId] = useState("All");
-  const [selectedStatus, setSelectedStatus] = useState("All");
 
-  // Pagination local states
   const [currentPage, setCurrentPage] = useState(1);
   const perPage = 20;
 
-  // Drawer Form states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [currentAlert, setCurrentAlert] = useState<Alert | null>(null);
   const [formData, setFormData] = useState({
-    title: "",
+    alert_type: "",
     farm_id: "",
-    content: "",
-    status: "unread",
+    tree_id: "",
+    priority: "",
+    date: "",
   });
 
-  // Delete Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"create" | "edit">("create");
+  const [detailRecord, setDetailRecord] = useState<Alert | null>(null);
 
-  // Build query params and fetch alerts from server
   const fetchAlerts = useCallback(() => {
     setLoading(true);
     setError(null);
@@ -77,7 +75,7 @@ export default function AlertsPage() {
         setTotalPages((data as any).total_pages ?? Math.ceil(((data as any).total ?? arr.length) / perPage));
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to load alert details.";
+        const msg = err instanceof Error ? err.message : "Không thể tải chi tiết cảnh báo.";
         setError(msg);
       })
       .finally(() => {
@@ -100,8 +98,8 @@ export default function AlertsPage() {
 
       Promise.allSettled([
         alertService.get<Alert[] & { total?: number; total_pages?: number }>({ params }),
-        farmService.get({ params: { per_page: 100 } }),
-        treeService.get({ params: { per_page: 100 } }),
+        loadAllPages(farmService),
+        loadAllPages(treeService),
       ])
         .then(([alertsResult, farmsResult, treesResult]) => {
           if (alertsResult.status === "fulfilled") {
@@ -111,7 +109,7 @@ export default function AlertsPage() {
             setTotalAlerts((alertsData as any).total ?? arr.length);
             setTotalPages((alertsData as any).total_pages ?? Math.ceil(((alertsData as any).total ?? arr.length) / perPage));
           } else {
-            const msg = alertsResult.reason instanceof Error ? alertsResult.reason.message : "Failed to load alert details.";
+            const msg = alertsResult.reason instanceof Error ? alertsResult.reason.message : "Không thể tải chi tiết cảnh báo.";
             setError(msg);
           }
           if (farmsResult.status === "fulfilled") {
@@ -131,91 +129,89 @@ export default function AlertsPage() {
     fetchAlerts();
   }, [currentPage, searchQuery, fetchAlerts]);
 
+  const treeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of trees) {
+      map.set(String(t._id), t.tree_code);
+    }
+    return map;
+  }, [trees]);
+
   const getFarmName = (id: string) => {
     const farm = farms.find((f) => f._id === id || f.farm_code === id);
-    return farm ? farm.farm_name : id;
+    return farm ? farm.farm_name : "";
   };
 
   const getTreeCode = (id: string) => {
-    const tree = trees.find((t) => t._id === id);
-    return tree ? tree.tree_code : id;
+    return treeMap.get(String(id)) ?? "";
   };
 
-  const getAlertStatusChipVariant = (status: string): "Warning" | "Success" | "Pending" => {
-    switch (status) {
-      case "unread":
-        return "Warning";
-      case "read":
-        return "Success";
-      default:
-        return "Pending";
-    }
-  };
-
-  // Set form states for Add Alert
   const handleAddClick = () => {
     setCurrentAlert(null);
     setFormData({
-      title: "",
+      alert_type: "",
       farm_id: farms[0]?._id || "",
-      content: "",
-      status: "unread",
+      tree_id: "",
+      priority: "High",
+      date: new Date().toISOString().split("T")[0],
     });
+    setDrawerMode("create");
     setIsDrawerOpen(true);
   };
 
-  // Set form states for Edit Alert
   const handleEditClick = (alertItem: Alert) => {
     setCurrentAlert(alertItem);
     setFormData({
-      title: alertItem.title,
+      alert_type: alertItem.alert_type,
       farm_id: alertItem.farm_id,
-      content: alertItem.content,
-      status: alertItem.status,
+      tree_id: alertItem.tree_id || "",
+      priority: alertItem.priority,
+      date: alertItem.date?.split(" ")[0] || alertItem.date || "",
     });
+    setDrawerMode("edit");
     setIsDrawerOpen(true);
   };
 
-  // Trigger Save/Update
+  const handleViewClick = (alertItem: Alert) => {
+    setDetailRecord(alertItem);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
       farm_id: formData.farm_id,
-      title: formData.title,
-      content: formData.content,
-      status: formData.status,
+      tree_id: formData.tree_id || undefined,
+      alert_type: formData.alert_type,
+      priority: formData.priority,
+      date: formData.date,
     };
 
     try {
       if (currentAlert) {
-        // Edit Action
         await alertService.put(currentAlert._id, payload);
       } else {
-        // Create Action
         await alertService.post(payload);
       }
       setIsDrawerOpen(false);
       fetchAlerts();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error saving alert data.";
+      const msg = err instanceof Error ? err.message : "Lỗi khi lưu dữ liệu cảnh báo.";
       alert(msg);
     }
   };
 
-  // Handle Delete Click
   const handleDeleteClick = (id: string) => {
     setSelectedAlertId(id);
     setIsDialogOpen(true);
   };
 
-  // Trigger Delete API
   const handleDeleteConfirm = async () => {
     if (selectedAlertId) {
       try {
         await alertService.delete(selectedAlertId);
         fetchAlerts();
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Error deleting alert.";
+        const msg = err instanceof Error ? err.message : "Lỗi khi xóa cảnh báo.";
         alert(msg);
       } finally {
         setIsDialogOpen(false);
@@ -224,75 +220,56 @@ export default function AlertsPage() {
     }
   };
 
-  // Dynamically resolve filters from API payload
-  const statuses = ["All", "unread", "read"];
-
-  // Client-side filtering for farm/status (unsupported by backend)
   const filteredAlerts = alerts.filter((a) => {
-    const matchesFarm = selectedFarmId === "All" || a.farm_id === selectedFarmId;
-    const matchesStatus = selectedStatus === "All" || a.status === selectedStatus;
-    return matchesFarm && matchesStatus;
+    return selectedFarmId === "All" || a.farm_id === selectedFarmId;
   });
 
-  // Dynamic statistics aggregations
-  const unreadAlerts = alerts.filter((a) => a.status === "unread").length;
-  const readAlerts = alerts.filter((a) => a.status === "read").length;
+  const uniqueTypes = new Set(alerts.map((a) => a.alert_type).filter(Boolean)).size;
   const targetFarms = new Set(alerts.map((a) => a.farm_id).filter(Boolean)).size;
+  const targetTrees = new Set(alerts.map((a) => a.tree_id).filter(Boolean)).size;
 
-  // Column mapping
   const columns = [
-    { key: "title", label: "Title", width: "1.2fr" },
-    { key: "farm_id", label: "Farm", width: "1fr" },
-    { key: "tree_id", label: "Tree", width: "1fr" },
-    { key: "content", label: "Content", width: "1.5fr" },
-    { key: "status", label: "Status", width: "110px" },
-    { key: "created_at", label: "Created At", width: "140px" },
-    { key: "actions", label: "Actions", width: "130px", className: "text-right" },
+    { key: "alert_type", label: "Loại cảnh báo", width: "1fr" },
+    { key: "farm_id", label: "Trang trại", width: "1fr" },
+    { key: "tree_id", label: "Cây", width: "1fr" },
+    { key: "priority", label: "Mức ưu tiên", width: "120px" },
+    { key: "date", label: "Ngày cảnh báo", width: "140px" },
+    { key: "created_at", label: "Ngày tạo", width: "140px" },
+    { key: "actions", label: "Thao tác", width: "130px", className: "text-right" },
   ];
 
-  // Map database elements to components representation
   const tableRows = filteredAlerts.map((row) => ({
-    title: <span className="font-semibold text-gray-900">{row.title}</span>,
+    alert_type: <span className="font-semibold text-gray-900">{vi(ALERT_TYPE_VI, row.alert_type) || row.alert_type}</span>,
     farm_id: <span className="text-gray-600 font-semibold">{getFarmName(row.farm_id)}</span>,
-    tree_id: <span className="text-gray-600 font-semibold">{row.tree_id ? getTreeCode(row.tree_id) : "N/A"}</span>,
-    content: (
-      <span className="text-gray-500 truncate max-w-[250px] block" title={row.content}>
-        {row.content}
-      </span>
-    ),
-    status: (
-      <StatusChip
-        label={row.status === "unread" ? "Unread" : "Read"}
-        variant={getAlertStatusChipVariant(row.status)}
-      />
-    ),
-    created_at: <span className="text-gray-500">{row.created_at || "N/A"}</span>,
+    tree_id: <span className="text-gray-600 font-semibold">{row.tree_id ? getTreeCode(row.tree_id) : "—"}</span>,
+    priority: <span className="text-gray-700">{vi(PRIORITY_VI, row.priority) || row.priority}</span>,
+    date: <span className="text-gray-500">{formatDateTime(row.date)}</span>,
+    created_at: <span className="text-gray-500">{formatDateTime(row.created_at)}</span>,
     actions: (
       <div className="flex items-center justify-end gap-2 pr-6">
         <button
-          onClick={() => {}}
+          onClick={() => handleViewClick(row)}
           type="button"
-          aria-label="View alert"
+          title="Xem"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-[#1E8449] hover:border-[#1E8449]/20 transition-all"
-          title="View"
         >
           <Eye className="w-4 h-4" />
         </button>
         <button
           onClick={() => handleEditClick(row)}
           type="button"
-          aria-label="Edit alert"
+          aria-label="Chỉnh sửa cảnh báo"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-blue-600 hover:border-blue-200 transition-all"
-          title="Edit"
+          title="Sửa"
         >
           <Edit2 className="w-4 h-4" />
         </button>
         <button
           onClick={() => handleDeleteClick(row._id)}
           type="button"
-          aria-label="Delete alert"
+          aria-label="Xóa cảnh báo"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-red-600 hover:border-red-200 transition-all"
-          title="Delete"
+          title="Xóa"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -300,7 +277,6 @@ export default function AlertsPage() {
     ),
   }));
 
-  // Drawer Footer layout
   const drawerFooter = (
     <div className="flex items-center justify-end gap-3">
       <button
@@ -308,62 +284,54 @@ export default function AlertsPage() {
         type="button"
         className="px-4 py-2 border border-gray-200 rounded-[12px] text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-all"
       >
-        Cancel
+        Hủy
       </button>
       <button
         onClick={handleSave}
         type="button"
         className="px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-[14px] font-semibold hover:bg-emerald-700 transition-all"
       >
-        Save
+        Lưu
       </button>
     </div>
   );
 
   const emptyState = error ? (
     <div className="text-red-600 text-sm font-semibold py-6 text-center">
-      {error}. Please try again later.
+      {error}. Vui lòng thử lại sau.
     </div>
   ) : undefined;
 
   return (
     <div className="flex flex-col h-full space-y-4">
       <Toolbar
-        title="Alerts"
+        title="Cảnh báo"
         searchValue={searchQuery}
         onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-        searchPlaceholder="Search alert..."
+        searchPlaceholder="Tìm cảnh báo..."
         action={
           <button onClick={handleAddClick} type="button" className="inline-flex items-center gap-2 px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-all focus:outline-none">
             <Plus className="w-4 h-4" />
-            <span>Add Alert</span>
+            <span>Thêm cảnh báo</span>
           </button>
         }
       >
         <div className="flex items-center gap-3">
-          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Farm:</span>
-          <select value={selectedFarmId} onChange={(e) => { setSelectedFarmId(e.target.value); setCurrentPage(1); }} aria-label="Filter by farm" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
-            <option value="All">All</option>
+          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Trang trại:</span>
+          <select value={selectedFarmId} onChange={(e) => { setSelectedFarmId(e.target.value); setCurrentPage(1); }} aria-label="Lọc theo trang trại" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
+            <option value="All">Tất cả</option>
             {farms.map((f) => (<option key={f._id} value={f._id}>{f.farm_name}</option>))}
-          </select>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Status:</span>
-          <select value={selectedStatus} onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }} aria-label="Filter by status" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
-            {statuses.map((s) => (<option key={s} value={s}>{s === "unread" ? "Unread" : s === "read" ? "Read" : "All"}</option>))}
           </select>
         </div>
       </Toolbar>
 
-      {/* 3. Aggregated Stat Summary Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard compact title="Total Alerts" value={loading ? "..." : totalAlerts.toLocaleString()} icon={ClipboardList} />
-        <StatCard compact title="Unread Alerts" value={loading ? "..." : unreadAlerts} icon={Sprout} color="text-blue-600" />
-        <StatCard compact title="Read Alerts" value={loading ? "..." : readAlerts} icon={Building2} color="text-amber-600" />
-        <StatCard compact title="Target Farms" value={loading ? "..." : targetFarms} icon={Grid} color="text-indigo-600" />
+        <StatCard compact title="Tổng cảnh báo" value={loading ? "..." : totalAlerts.toLocaleString()} icon={ClipboardList} />
+        <StatCard compact title="Loại cảnh báo" value={loading ? "..." : uniqueTypes} icon={Bug} color="text-blue-600" />
+        <StatCard compact title="Trang trại bị ảnh hưởng" value={loading ? "..." : targetFarms} icon={Building2} color="text-amber-600" />
+        <StatCard compact title="Cây bị ảnh hưởng" value={loading ? "..." : targetTrees} icon={TreePine} color="text-indigo-600" />
       </div>
 
-      {/* 4. Data Table Grid Layout */}
       <DataTable
         columns={columns}
         rows={tableRows}
@@ -371,7 +339,6 @@ export default function AlertsPage() {
         emptyState={emptyState}
       />
 
-      {/* 5. Pagination Control Footer */}
       <Pagination
         page={currentPage}
         totalPages={totalPages}
@@ -380,9 +347,8 @@ export default function AlertsPage() {
         onChange={(p) => setCurrentPage(p)}
       />
 
-      {/* 6. Slide-Out Drawer Form Container */}
       <DrawerForm
-        title={currentAlert ? "Edit Alert" : "Add Alert"}
+        title={drawerMode === "edit" ? "Sửa cảnh báo" : "Thêm cảnh báo"}
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         footer={drawerFooter}
@@ -390,30 +356,30 @@ export default function AlertsPage() {
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Title
+              Loại cảnh báo
             </label>
             <input
               type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="e.g. Leaf Spot Infection"
-              aria-label="Title"
+              value={formData.alert_type}
+              onChange={(e) => setFormData({ ...formData, alert_type: e.target.value })}
+              placeholder="VD: Leaf Spot"
+              aria-label="Loại cảnh báo"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
               required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Farm
+              Trang trại
             </label>
             <select
               value={formData.farm_id}
               onChange={(e) => setFormData({ ...formData, farm_id: e.target.value })}
-              aria-label="Farm"
+              aria-label="Trang trại"
               className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none"
               required
             >
-              <option value="">Select a farm</option>
+              <option value="">Chọn trang trại</option>
               {farms.map((f) => (
                 <option key={f._id} value={f._id}>
                   {f.farm_name}
@@ -423,40 +389,94 @@ export default function AlertsPage() {
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Content
+              Cây
             </label>
-            <textarea
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              rows={3}
-              placeholder="e.g. AI detected Leaf Spot..."
-              aria-label="Content"
-              className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none resize-none"
-              required
-            />
+            <select
+              value={formData.tree_id}
+              onChange={(e) => setFormData({ ...formData, tree_id: e.target.value })}
+              aria-label="Cây"
+              className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none"
+            >
+              <option value="">Chọn cây</option>
+              {trees.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.tree_code}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Status
+              Mức ưu tiên
             </label>
             <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              aria-label="Status"
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              aria-label="Mức ưu tiên"
               className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none"
               required
             >
-              <option value="unread">Unread</option>
-              <option value="read">Read</option>
+              <option value="">Chọn mức ưu tiên</option>
+              <option value="Critical">Khẩn cấp</option>
+              <option value="High">Cao</option>
+              <option value="Medium">Trung bình</option>
+              <option value="Low">Thấp</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+              Ngày cảnh báo
+            </label>
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              aria-label="Ngày cảnh báo"
+              className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+              required
+            />
           </div>
         </form>
       </DrawerForm>
 
-      {/* 7. Dialog Confirmation Modal */}
+      <RecordDetailDrawer
+        title="Chi tiết cảnh báo"
+        open={!!detailRecord}
+        onClose={() => setDetailRecord(null)}
+        sections={
+          detailRecord
+            ? [
+                {
+                  title: "Thông tin cảnh báo",
+                  fields: [
+                    { label: "Loại cảnh báo", value: vi(ALERT_TYPE_VI, detailRecord.alert_type) || detailRecord.alert_type },
+                    { label: "Mức ưu tiên", value: vi(PRIORITY_VI, detailRecord.priority) || detailRecord.priority },
+                  ],
+                },
+                {
+                  title: "Vị trí",
+                  fields: [
+                    { label: "Trang trại", value: getFarmName(detailRecord.farm_id) },
+                    ...(detailRecord.tree_id
+                      ? [{ label: "Cây", value: getTreeCode(detailRecord.tree_id) }]
+                      : []),
+                  ],
+                },
+                {
+                  title: "Thời gian",
+                  fields: [
+                    { label: "Ngày cảnh báo", value: formatDateTime(detailRecord.date) },
+                    { label: "Ngày tạo", value: formatDateTime(detailRecord.created_at) },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
+
       <ConfirmDialog
-        title="Delete Alert"
-        description="Are you sure you want to delete this alert?"
+        title="Xóa cảnh báo"
+        description="Bạn có chắc chắn muốn xóa cảnh báo này?"
         open={isDialogOpen}
         onConfirm={handleDeleteConfirm}
         onCancel={() => {

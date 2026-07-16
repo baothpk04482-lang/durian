@@ -4,9 +4,10 @@ import {
   Sprout,
   Grid,
   TreePine,
-  Eye,
+
   Edit2,
   Trash2,
+  Eye,
   Plus
 } from "lucide-react";
 import Toolbar from "../../components/common/Toolbar";
@@ -14,11 +15,13 @@ import StatCard from "../../components/common/StatCard";
 import DataTable from "../../components/common/DataTable";
 import Pagination from "../../components/common/Pagination";
 import DrawerForm from "../../components/common/DrawerForm";
+import RecordDetailDrawer from "../../components/common/RecordDetailDrawer";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { zoneService } from "../../services/zone.service";
 import { farmService } from "../../services/farm.service";
 import type { Zone } from "../../types/zone";
 import type { Farm } from "../../types/farm";
+import { formatDateTime } from "../../utils/dateFormatter";
 
 export default function ZonesPage() {
   const [zones, setZones] = useState<Zone[]>([]);
@@ -45,6 +48,8 @@ export default function ZonesPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"create" | "edit">("create");
+  const [detailRecord, setDetailRecord] = useState<Zone | null>(null);
 
   const fetchZones = useCallback(() => {
     setLoading(true);
@@ -65,7 +70,7 @@ export default function ZonesPage() {
         setTotalPages((data as any).total_pages ?? Math.ceil(((data as any).total ?? arr.length) / perPage));
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to load zone details.";
+        const msg = err instanceof Error ? err.message : "Không thể tải chi tiết khu vực.";
         setError(msg);
       })
       .finally(() => {
@@ -98,7 +103,7 @@ export default function ZonesPage() {
             setTotalZones((zonesData as any).total ?? arr.length);
             setTotalPages((zonesData as any).total_pages ?? Math.ceil(((zonesData as any).total ?? arr.length) / perPage));
           } else {
-            const msg = zonesResult.reason instanceof Error ? zonesResult.reason.message : "Failed to load zone details.";
+            const msg = zonesResult.reason instanceof Error ? zonesResult.reason.message : "Không thể tải chi tiết khu vực.";
             setError(msg);
           }
           if (farmsResult.status === "fulfilled") {
@@ -127,6 +132,7 @@ export default function ZonesPage() {
       farm_id: farms[0]?._id || "",
       tree_count: 0,
     });
+    setDrawerMode("create");
     setIsDrawerOpen(true);
   };
 
@@ -137,7 +143,12 @@ export default function ZonesPage() {
       farm_id: zone.farm_id,
       tree_count: zone.tree_count,
     });
+    setDrawerMode("edit");
     setIsDrawerOpen(true);
+  };
+
+  const handleViewClick = (zone: Zone) => {
+    setDetailRecord(zone);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -157,7 +168,7 @@ export default function ZonesPage() {
       setIsDrawerOpen(false);
       fetchZones();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error saving zone data.";
+      const msg = err instanceof Error ? err.message : "Lỗi khi lưu dữ liệu khu vực.";
       alert(msg);
     }
   };
@@ -173,7 +184,7 @@ export default function ZonesPage() {
         await zoneService.delete(selectedZoneId);
         fetchZones();
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Error deleting zone.";
+        const msg = err instanceof Error ? err.message : "Lỗi khi xóa khu vực.";
         alert(msg);
       } finally {
         setIsDialogOpen(false);
@@ -187,44 +198,43 @@ export default function ZonesPage() {
   const maxTreesPerZone = zones.length > 0 ? Math.max(...zones.map((z) => z.tree_count || 0)) : 0;
 
   const columns = [
-    { key: "zone_name", label: "Zone Name", width: "1fr" },
-    { key: "farm_id", label: "Farm", width: "1fr" },
-    { key: "tree_count", label: "Trees", width: "100px" },
-    { key: "created_at", label: "Created At", width: "140px" },
-    { key: "actions", label: "Actions", width: "130px", className: "text-right" },
+    { key: "zone_name", label: "Tên khu vực", width: "1fr" },
+    { key: "farm_id", label: "Trang trại", width: "1fr" },
+    { key: "tree_count", label: "Cây", width: "100px" },
+    { key: "created_at", label: "Ngày tạo", width: "140px" },
+    { key: "actions", label: "Thao tác", width: "130px", className: "text-right" },
   ];
 
   const tableRows = zones.map((row) => ({
     zone_name: <span className="font-semibold text-gray-900">{row.zone_name}</span>,
     farm_id: <span className="text-gray-600 font-semibold">{getFarmName(row.farm_id)}</span>,
     tree_count: <span className="text-gray-700">{(row.tree_count || 0).toLocaleString()}</span>,
-    created_at: <span className="text-gray-500">{row.created_at || "N/A"}</span>,
+    created_at: <span className="text-gray-500">{formatDateTime(row.created_at)}</span>,
     actions: (
       <div className="flex items-center justify-end gap-2 pr-6">
         <button
-          onClick={() => {}}
+          onClick={() => handleViewClick(row)}
           type="button"
-          aria-label="View zone"
+          title="Xem"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-[#1E8449] hover:border-[#1E8449]/20 transition-all"
-          title="View"
         >
           <Eye className="w-4 h-4" />
         </button>
         <button
           onClick={() => handleEditClick(row)}
           type="button"
-          aria-label="Edit zone"
+          aria-label="Chỉnh sửa khu vực"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-blue-600 hover:border-blue-200 transition-all"
-          title="Edit"
+          title="Sửa"
         >
           <Edit2 className="w-4 h-4" />
         </button>
         <button
           onClick={() => handleDeleteClick(row._id)}
           type="button"
-          aria-label="Delete zone"
+          aria-label="Xóa khu vực"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-red-600 hover:border-red-200 transition-all"
-          title="Delete"
+          title="Xóa"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -239,52 +249,52 @@ export default function ZonesPage() {
         type="button"
         className="px-4 py-2 border border-gray-200 rounded-[12px] text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-all"
       >
-        Cancel
+        Hủy
       </button>
       <button
         onClick={handleSave}
         type="button"
         className="px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-[14px] font-semibold hover:bg-emerald-700 transition-all"
       >
-        Save
+        Lưu
       </button>
     </div>
   );
 
   const emptyState = error ? (
     <div className="text-red-600 text-sm font-semibold py-6 text-center">
-      {error}. Please try again later.
+      {error}. Vui lòng thử lại sau.
     </div>
   ) : undefined;
 
   return (
     <div className="flex flex-col h-full space-y-4">
       <Toolbar
-        title="Zones"
+        title="Khu vực"
         searchValue={searchQuery}
         onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-        searchPlaceholder="Search zone..."
+        searchPlaceholder="Tìm kiếm khu vực..."
         action={
           <button onClick={handleAddClick} type="button" className="inline-flex items-center gap-2 px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-all focus:outline-none">
             <Plus className="w-4 h-4" />
-            <span>Add Zone</span>
+            <span>Thêm khu vực</span>
           </button>
         }
       >
         <div className="flex items-center gap-3">
-          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Farm:</span>
-          <select value={selectedFarmId} onChange={(e) => { setSelectedFarmId(e.target.value); setCurrentPage(1); }} aria-label="Filter by farm" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
-            <option value="All">All</option>
+          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Trang trại:</span>
+          <select value={selectedFarmId} onChange={(e) => { setSelectedFarmId(e.target.value); setCurrentPage(1); }} aria-label="Lọc theo trang trại" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
+            <option value="All">Tất cả</option>
             {farms.map((f) => (<option key={f._id} value={f._id}>{f.farm_name}</option>))}
           </select>
         </div>
       </Toolbar>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard compact title="Total Zones" value={loading ? "..." : totalZones} icon={Grid} />
-        <StatCard compact title="Average Trees / Zone" value={loading ? "..." : averageTreesPerZone} icon={Building2} color="text-blue-600" />
-        <StatCard compact title="Total Trees" value={loading ? "..." : totalTrees.toLocaleString()} icon={TreePine} color="text-amber-600" />
-        <StatCard compact title="Max Trees in Zone" value={loading ? "..." : maxTreesPerZone} icon={Sprout} color="text-indigo-600" />
+        <StatCard compact title="Tổng khu vực" value={loading ? "..." : totalZones} icon={Grid} />
+        <StatCard compact title="Cây trung bình / Khu vực" value={loading ? "..." : averageTreesPerZone} icon={Building2} color="text-blue-600" />
+        <StatCard compact title="Tổng cây" value={loading ? "..." : totalTrees.toLocaleString()} icon={TreePine} color="text-amber-600" />
+        <StatCard compact title="Cây nhiều nhất trong khu vực" value={loading ? "..." : maxTreesPerZone} icon={Sprout} color="text-indigo-600" />
       </div>
 
       <DataTable
@@ -303,7 +313,7 @@ export default function ZonesPage() {
       />
 
       <DrawerForm
-        title={currentZone ? "Edit Zone" : "Add Zone"}
+        title={drawerMode === "edit" ? "Sửa khu vực" : "Thêm khu vực"}
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         footer={drawerFooter}
@@ -311,30 +321,32 @@ export default function ZonesPage() {
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Zone Name
+              Tên khu vực
             </label>
             <input
               type="text"
               value={formData.zone_name}
               onChange={(e) => setFormData({ ...formData, zone_name: e.target.value })}
-              placeholder="e.g. Zone A3"
-              aria-label="Zone Name"
+              placeholder="VD: Zone A3"
+              aria-label="Tên khu vực"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+             
               required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Farm
+              Trang trại
             </label>
             <select
               value={formData.farm_id}
               onChange={(e) => setFormData({ ...formData, farm_id: e.target.value })}
-              aria-label="Farm"
+              aria-label="Trang trại"
               className="w-full px-3 py-2 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none"
+             
               required
             >
-              <option value="">Select a farm</option>
+              <option value="">Chọn trang trại</option>
               {farms.map((f) => (
                 <option key={f._id} value={f._id}>
                   {f.farm_name}
@@ -344,24 +356,62 @@ export default function ZonesPage() {
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Tree Count
+              Số lượng cây
             </label>
             <input
               type="number"
               value={formData.tree_count}
               onChange={(e) => setFormData({ ...formData, tree_count: Number(e.target.value) || 0 })}
-              placeholder="e.g. 150"
-              aria-label="Tree Count"
+              placeholder="VD: 150"
+              aria-label="Số lượng cây"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+             
               required
             />
           </div>
         </form>
       </DrawerForm>
 
+      <RecordDetailDrawer
+        title="Chi tiết khu vực"
+        open={!!detailRecord}
+        onClose={() => setDetailRecord(null)}
+        sections={
+          detailRecord
+            ? [
+                {
+                  title: "Thông tin chung",
+                  fields: [
+                    { label: "Tên khu vực", value: detailRecord.zone_name },
+                    { label: "Mã khu vực", value: detailRecord.zone_code || "—" },
+                  ],
+                },
+                {
+                  title: "Thuộc trang trại",
+                  fields: [
+                    { label: "Trang trại", value: getFarmName(detailRecord.farm_id) },
+                  ],
+                },
+                {
+                  title: "Thống kê",
+                  fields: [
+                    { label: "Số lượng cây", value: (detailRecord.tree_count || 0).toLocaleString() },
+                  ],
+                },
+                {
+                  title: "Thời gian",
+                  fields: [
+                    { label: "Ngày tạo", value: formatDateTime(detailRecord.created_at) },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
+
       <ConfirmDialog
-        title="Delete Zone"
-        description="Are you sure you want to delete this zone?"
+        title="Xóa khu vực"
+        description="Bạn có chắc chắn muốn xóa khu vực này?"
         open={isDialogOpen}
         onConfirm={handleDeleteConfirm}
         onCancel={() => {

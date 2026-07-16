@@ -7,7 +7,7 @@ interface SearchBarProps {
   className?: string;
 }
 
-export default function SearchBar({ placeholder = "Search...", value, onChange, className }: SearchBarProps) {
+export default function SearchBar({ placeholder = "Tìm kiếm...", value, onChange, className }: SearchBarProps) {
   const handleClear = () => {
     onChange("");
   };
@@ -29,7 +29,7 @@ export default function SearchBar({ placeholder = "Search...", value, onChange, 
         <button
           onClick={handleClear}
           type="button"
-          aria-label="Clear search"
+          aria-label="Xóa tìm kiếm"
           className="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors"
         >
           <X className="w-4 h-4" />

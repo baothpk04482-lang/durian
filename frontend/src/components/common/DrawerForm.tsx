@@ -49,7 +49,7 @@ export default function DrawerForm({ title, open, onClose, footer, children }: D
           <button
             onClick={onClose}
             type="button"
-            aria-label="Close drawer"
+            aria-label="Đóng bảng"
             className="w-10 h-10 rounded-[12px] flex items-center justify-center border border-gray-100 text-gray-400 hover:text-gray-700 hover:border-gray-200 transition-all"
           >
             <X className="w-5 h-5" />

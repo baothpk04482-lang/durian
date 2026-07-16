@@ -37,8 +37,8 @@ export default function DataTable({ columns, rows, emptyState, loading = false, 
               <SearchX className="w-6 h-6 text-gray-300" />
             </div>
             <div>
-              <p className="text-[14px] font-semibold text-gray-500">No data found</p>
-              <p className="text-[12px] text-gray-400 mt-0.5">Try adjusting your search or filter criteria.</p>
+              <p className="text-[14px] font-semibold text-gray-500">Không có dữ liệu</p>
+              <p className="text-[12px] text-gray-400 mt-0.5">Hãy thử thay đổi từ khóa hoặc bộ lọc.</p>
             </div>
           </div>
         )}

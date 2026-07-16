@@ -11,7 +11,6 @@ import {
   History,
   AlertTriangle,
   Bug,
-  Settings,
   ChevronLeft,
   ChevronRight,
   Leaf
@@ -27,18 +26,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const currentPath = location.pathname;
 
   const menuItems = [
-    { label: "Dashboard", path: "/", icon: LayoutDashboard },
-    { label: "Companies", path: "/companies", icon: Building2 },
-    { label: "Farms", path: "/farms", icon: Sprout },
-    { label: "Zones", path: "/zones", icon: Grid },
-    { label: "Trees", path: "/trees", icon: TreePine },
-    { label: "Users", path: "/users", icon: Users },
-    { label: "Inspections", path: "/inspections", icon: ClipboardCheck },
-    { label: "Detection Results", path: "/detection-results", icon: Scan },
-    { label: "Disease History", path: "/disease-history", icon: History },
-    { label: "Alerts", path: "/alerts", icon: AlertTriangle },
-    { label: "Diseases", path: "/diseases", icon: Bug },
-    { label: "Settings", path: "/settings", icon: Settings },
+    { label: "Bảng điều khiển", path: "/dashboard", icon: LayoutDashboard },
+    { label: "Công ty", path: "/companies", icon: Building2 },
+    { label: "Trang trại", path: "/farms", icon: Sprout },
+    { label: "Khu vực", path: "/zones", icon: Grid },
+    { label: "Cây", path: "/trees", icon: TreePine },
+    { label: "Người dùng", path: "/users", icon: Users },
+    { label: "Kiểm tra", path: "/inspections", icon: ClipboardCheck },
+    { label: "Kết quả nhận diện", path: "/detection-results", icon: Scan },
+    { label: "Lịch sử phát sinh bệnh", path: "/disease-history", icon: History },
+    { label: "Cảnh báo", path: "/alerts", icon: AlertTriangle },
+    { label: "Bệnh", path: "/diseases", icon: Bug },
   ];
 
   return (
@@ -66,7 +64,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive =
-            item.path === "/"
+            item.path === "/dashboard"
               ? currentPath === "/" || currentPath === "/dashboard"
               : currentPath === item.path || currentPath.startsWith(item.path + "/");
           return (
@@ -90,21 +88,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* Bottom Profile and Collapse Button */}
-      <div className="border-t border-emerald-900/40 p-4 space-y-3">
-        {/* User Profile Card */}
-        <div className="flex items-center gap-3 p-2 bg-emerald-950/30 rounded-[12px]">
-          <div className="w-9 h-9 rounded-full bg-emerald-800 flex items-center justify-center font-semibold text-emerald-200 flex-shrink-0">
-            JD
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold truncate leading-none text-white">John Doe</p>
-              <p className="text-[10px] text-emerald-300/60 mt-1 leading-none">Admin</p>
-            </div>
-          )}
-        </div>
-
+      {/* Bottom Collapse Button */}
+      <div className="border-t border-emerald-900/40 p-4">
         {/* Collapse Button */}
         <button
           onClick={onToggle}
@@ -116,7 +101,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           ) : (
             <div className="flex items-center gap-2">
               <ChevronLeft className="w-5 h-5" />
-              <span className="text-xs font-medium">Collapse Menu</span>
+              <span className="text-xs font-medium">Thu gọn menu</span>
             </div>
           )}
         </button>

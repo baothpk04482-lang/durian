@@ -1,27 +1,21 @@
 export interface Disease {
-  _id: string; // MongoDB document identifier
+  _id: string;
+  code: string;
   name: string;
-  disease_name?: string;
-  common_name?: string;
-  scientific_name: string;
-  category: string;
-  description?: string;
-  symptoms: string[] | string;
-  treatment: string;
-  prevention: string;
+  affected_part: string;
   severity: string;
+  description?: string;
+  recommendation: string;
   created_at: string;
 }
 
 export interface CreateDiseaseRequest {
+  code: string;
   name: string;
-  scientific_name: string;
-  category: string;
-  symptoms: string[] | string;
-  treatment: string;
-  prevention: string;
+  affected_part: string;
   severity: string;
   description?: string;
+  recommendation: string;
 }
 
 export type UpdateDiseaseRequest = Partial<CreateDiseaseRequest>;

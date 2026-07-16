@@ -14,25 +14,25 @@ export default function RealtimeInspectionCard({ data, onRefresh }: RealtimeInsp
     <Card className="flex flex-col overflow-hidden" style={{ height: "420px" }}>
       <SectionTitle
         icon={<ClipboardList className="w-5 h-5 text-emerald-600" />}
-        title="Realtime Inspection Activity"
+        title="Nhật ký kiểm tra thực địa"
         size="section"
-        subtitle="What happened today?"
+        subtitle="Cập nhật kết quả kiểm tra và nhận diện AI theo thời gian thực."
         actions={
           <div className="flex items-center" style={{ gap: "8px" }}>
             <button
               type="button"
               className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-[8px] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              aria-label="Export to Excel"
+              aria-label="Xuất dữ liệu"
             >
               <Download className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Export Excel</span>
+              <span>Xuất Excel / CSV</span>
             </button>
             {onRefresh && (
               <button
                 type="button"
                 onClick={onRefresh}
                 className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-[8px] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                aria-label="Refresh inspection data"
+                aria-label="Làm mới dữ liệu"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>

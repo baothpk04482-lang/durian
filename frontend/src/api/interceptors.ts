@@ -52,9 +52,11 @@ export const setupInterceptors = (axiosInstance: AxiosInstance): AxiosInstance =
       if (error.response) {
         const status = error.response.status;
         
-        // TODO: Central error logic (e.g. redirect on 401 unauthenticated)
         if (status === 401) {
-          // Future token refresh or redirect logic placeholder
+          tokenStorage.clearTokens();
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
         }
       }
       return Promise.reject(error);

@@ -4,9 +4,9 @@ import {
   Sprout,
   Grid,
   TreePine,
-  Eye,
   Edit2,
   Trash2,
+  Eye,
   Plus
 } from "lucide-react";
 import Toolbar from "../../components/common/Toolbar";
@@ -14,9 +14,11 @@ import StatCard from "../../components/common/StatCard";
 import DataTable from "../../components/common/DataTable";
 import Pagination from "../../components/common/Pagination";
 import DrawerForm from "../../components/common/DrawerForm";
+import RecordDetailDrawer from "../../components/common/RecordDetailDrawer";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { companyService } from "../../services/company.service";
 import type { Company } from "../../types/company";
+import { formatDateTime } from "../../utils/dateFormatter";
 
 export default function CompaniesPage() {
   // Live API data states
@@ -50,6 +52,8 @@ export default function CompaniesPage() {
   // Delete Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"create" | "edit">("create");
+  const [detailRecord, setDetailRecord] = useState<Company | null>(null);
 
   // Build query params and fetch companies from server
   const fetchCompanies = useCallback(() => {
@@ -70,7 +74,7 @@ export default function CompaniesPage() {
         setTotalPages((data as any).total_pages ?? Math.ceil(((data as any).total ?? arr.length) / perPage));
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to fetch companies data.";
+        const msg = err instanceof Error ? err.message : "Không thể tải dữ liệu công ty.";
         setError(msg);
       })
       .finally(() => {
@@ -102,7 +106,7 @@ export default function CompaniesPage() {
             setTotalCompanies((companiesData as any).total ?? arr.length);
             setTotalPages((companiesData as any).total_pages ?? Math.ceil(((companiesData as any).total ?? arr.length) / perPage));
           } else {
-            const msg = companiesResult.reason instanceof Error ? companiesResult.reason.message : "Failed to fetch companies data.";
+            const msg = companiesResult.reason instanceof Error ? companiesResult.reason.message : "Không thể tải dữ liệu công ty.";
             setError(msg);
           }
         })
@@ -125,6 +129,7 @@ export default function CompaniesPage() {
       district: "",
       province: "",
     });
+    setDrawerMode("create");
     setIsDrawerOpen(true);
   };
 
@@ -137,7 +142,12 @@ export default function CompaniesPage() {
       district: company.district,
       province: company.province,
     });
+    setDrawerMode("edit");
     setIsDrawerOpen(true);
+  };
+
+  const handleViewClick = (company: Company) => {
+    setDetailRecord(company);
   };
 
   // Trigger Save/Update
@@ -154,7 +164,7 @@ export default function CompaniesPage() {
       setIsDrawerOpen(false);
       fetchCompanies();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error saving company data.";
+      const msg = err instanceof Error ? err.message : "Lỗi khi lưu dữ liệu công ty.";
       alert(msg);
     }
   };
@@ -172,7 +182,7 @@ export default function CompaniesPage() {
         await companyService.delete(selectedCompanyId);
         fetchCompanies();
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Error deleting company.";
+        const msg = err instanceof Error ? err.message : "Lỗi khi xóa công ty.";
         alert(msg);
       } finally {
         setIsDialogOpen(false);
@@ -199,12 +209,12 @@ export default function CompaniesPage() {
 
   // Column mapping
   const columns = [
-    { key: "company_code", label: "Company Code", width: "120px" },
-    { key: "company_name", label: "Company Name", width: "1fr" },
-    { key: "district", label: "District", width: "1fr" },
-    { key: "province", label: "Province", width: "1fr" },
-    { key: "created_at", label: "Created At", width: "140px" },
-    { key: "actions", label: "Actions", width: "130px", className: "text-right" },
+    { key: "company_code", label: "Mã công ty", width: "120px" },
+    { key: "company_name", label: "Tên công ty", width: "1fr" },
+    { key: "district", label: "Quận/Huyện", width: "1fr" },
+    { key: "province", label: "Tỉnh/Thành phố", width: "1fr" },
+    { key: "created_at", label: "Ngày tạo", width: "140px" },
+    { key: "actions", label: "Thao tác", width: "130px", className: "text-right" },
   ];
 
   // Map database elements to components representation
@@ -213,13 +223,13 @@ export default function CompaniesPage() {
     company_name: <span className="text-gray-700">{row.company_name}</span>,
     district: <span className="text-gray-600">{row.district}</span>,
     province: <span className="text-gray-600">{row.province}</span>,
-    created_at: <span className="text-gray-500">{row.created_at || "N/A"}</span>,
+    created_at: <span className="text-gray-500">{formatDateTime(row.created_at)}</span>,
     actions: (
       <div className="flex items-center justify-end gap-2 pr-6">
         <button
-          onClick={() => {}}
+          onClick={() => handleViewClick(row)}
           type="button"
-          title="View"
+          title="Xem"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-[#1E8449] hover:border-[#1E8449]/20 transition-all"
         >
           <Eye className="w-4 h-4" />
@@ -227,7 +237,7 @@ export default function CompaniesPage() {
         <button
           onClick={() => handleEditClick(row)}
           type="button"
-          title="Edit"
+          title="Sửa"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-blue-600 hover:border-blue-200 transition-all"
         >
           <Edit2 className="w-4 h-4" />
@@ -235,7 +245,7 @@ export default function CompaniesPage() {
         <button
           onClick={() => handleDeleteClick(row._id)}
           type="button"
-          title="Delete"
+          title="Xóa"
           className="w-9 h-9 rounded-[10px] flex items-center justify-center border border-gray-200 bg-white text-gray-400 hover:bg-[#F8FAFC] hover:text-red-600 hover:border-red-200 transition-all"
         >
           <Trash2 className="w-4 h-4" />
@@ -252,21 +262,21 @@ export default function CompaniesPage() {
         type="button"
         className="px-4 py-2 border border-gray-200 rounded-[12px] text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-all"
       >
-        Cancel
+        Hủy
       </button>
       <button
         onClick={handleSave}
         type="button"
         className="px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-[14px] font-semibold hover:bg-emerald-700 transition-all"
       >
-        Save
+        Lưu
       </button>
     </div>
   );
 
   const emptyState = error ? (
     <div className="text-red-600 text-sm font-semibold py-6 text-center">
-      {error}. Please try again later.
+      {error}. Vui lòng thử lại sau.
     </div>
   ) : undefined;
 
@@ -274,26 +284,26 @@ export default function CompaniesPage() {
     <div className="flex flex-col h-full space-y-4">
       {/* 1. Toolbar */}
       <Toolbar
-        title="Companies"
+        title="Công ty"
         searchValue={searchQuery}
         onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-        searchPlaceholder="Search company..."
+        searchPlaceholder="Tìm kiếm công ty..."
         action={
           <button onClick={handleAddClick} type="button" className="inline-flex items-center gap-2 px-4 py-2 bg-[#1E8449] text-white rounded-[12px] text-sm font-semibold hover:bg-emerald-700 shadow-sm transition-all focus:outline-none">
             <Plus className="w-4 h-4" />
-            <span>Add Company</span>
+            <span>Thêm công ty</span>
           </button>
         }
       >
         <div className="flex items-center gap-3">
-          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Province:</span>
-          <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setCurrentPage(1); }} aria-label="Filter by province" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
+          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Tỉnh/Thành phố:</span>
+          <select value={selectedProvince} onChange={(e) => { setSelectedProvince(e.target.value); setCurrentPage(1); }} aria-label="Lọc theo tỉnh" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
             {provinces.map((prov) => (<option key={prov} value={prov}>{prov}</option>))}
           </select>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">District:</span>
-          <select value={selectedDistrict} onChange={(e) => { setSelectedDistrict(e.target.value); setCurrentPage(1); }} aria-label="Filter by district" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
+          <span className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Quận/Huyện:</span>
+          <select value={selectedDistrict} onChange={(e) => { setSelectedDistrict(e.target.value); setCurrentPage(1); }} aria-label="Lọc theo huyện" className="px-3 py-1.5 border border-gray-200 bg-white rounded-[10px] text-[14px] text-gray-700 focus:outline-none">
             {districts.map((dist) => (<option key={dist} value={dist}>{dist}</option>))}
           </select>
         </div>
@@ -301,10 +311,10 @@ export default function CompaniesPage() {
 
       {/* 3. Aggregated Stat Summary Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard compact title="Total Companies" value={loading ? "..." : totalCompanies.toLocaleString()} icon={Building2} />
-        <StatCard compact title="Total Farms" value={loading ? "..." : totalFarms} icon={Sprout} color="text-blue-600" />
-        <StatCard compact title="Total Zones" value={loading ? "..." : totalZones} icon={Grid} color="text-amber-600" />
-        <StatCard compact title="Total Trees" value={loading ? "..." : totalTrees} icon={TreePine} color="text-indigo-600" />
+        <StatCard compact title="Tổng công ty" value={loading ? "..." : totalCompanies.toLocaleString()} icon={Building2} />
+        <StatCard compact title="Tổng trang trại" value={loading ? "..." : totalFarms} icon={Sprout} color="text-blue-600" />
+        <StatCard compact title="Tổng khu vực" value={loading ? "..." : totalZones} icon={Grid} color="text-amber-600" />
+        <StatCard compact title="Tổng cây" value={loading ? "..." : totalTrees} icon={TreePine} color="text-indigo-600" />
       </div>
 
       {/* 4. Data Table Grid Layout */}
@@ -326,7 +336,7 @@ export default function CompaniesPage() {
 
       {/* 6. Slide-Out Drawer Form Container */}
       <DrawerForm
-        title={currentCompany ? "Edit Company" : "Add Company"}
+        title={drawerMode === "edit" ? "Sửa công ty" : "Thêm công ty"}
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         footer={drawerFooter}
@@ -334,67 +344,111 @@ export default function CompaniesPage() {
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Company Code
+              Mã công ty
             </label>
             <input
               type="text"
               value={formData.company_code}
               onChange={(e) => setFormData({ ...formData, company_code: e.target.value })}
-              placeholder="e.g. COM-005"
-              aria-label="Company Code"
+              placeholder="VD: COM-005"
+              aria-label="Mã công ty"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+             
               required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Company Name
+              Tên công ty
             </label>
             <input
               type="text"
               value={formData.company_name}
               onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-              placeholder="e.g. Chumphon Green Fields"
-              aria-label="Company Name"
+              placeholder="VD: Chumphon Green Fields"
+              aria-label="Tên công ty"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+             
               required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              District
+              Quận/Huyện
             </label>
             <input
               type="text"
               value={formData.district}
               onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-              placeholder="e.g. Lamae"
-              aria-label="District"
+              placeholder="VD: Lamae"
+              aria-label="Huyện"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+             
               required
             />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Province
+              Tỉnh/Thành phố
             </label>
             <input
               type="text"
               value={formData.province}
               onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-              placeholder="e.g. Chumphon"
-              aria-label="Province"
+              placeholder="VD: Chumphon"
+              aria-label="Tỉnh"
               className="w-full px-3 py-2 border border-gray-200 rounded-[10px] bg-white text-[14px] focus:outline-none"
+             
               required
             />
           </div>
         </form>
       </DrawerForm>
 
+      <RecordDetailDrawer
+        title="Chi tiết công ty"
+        open={!!detailRecord}
+        onClose={() => setDetailRecord(null)}
+        sections={
+          detailRecord
+            ? [
+                {
+                  title: "Thông tin chung",
+                  fields: [
+                    { label: "Mã công ty", value: detailRecord.company_code },
+                    { label: "Tên công ty", value: detailRecord.company_name },
+                  ],
+                },
+                {
+                  title: "Vị trí",
+                  fields: [
+                    { label: "Quận/Huyện", value: detailRecord.district },
+                    { label: "Tỉnh/Thanh phố", value: detailRecord.province },
+                  ],
+                },
+                {
+                  title: "Thống kê",
+                  fields: [
+                    { label: "Tổng trang trại", value: detailRecord.total_farms?.toLocaleString() ?? "0" },
+                    { label: "Tổng khu vực", value: detailRecord.total_zones?.toLocaleString() ?? "0" },
+                    { label: "Tổng cây", value: detailRecord.total_trees?.toLocaleString() ?? "0" },
+                  ],
+                },
+                {
+                  title: "Thời gian",
+                  fields: [
+                    { label: "Ngày tạo", value: formatDateTime(detailRecord.created_at) },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
+
       {/* 7. Dialog Confirmation Modal */}
       <ConfirmDialog
-        title="Delete Company"
-        description="Are you sure you want to delete this company?"
+        title="Xóa công ty"
+        description="Bạn có chắc chắn muốn xóa công ty này?"
         open={isDialogOpen}
         onConfirm={handleDeleteConfirm}
         onCancel={() => {

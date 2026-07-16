@@ -1,4 +1,5 @@
 // Dedicated mock data objects (Mock Data Policy)
+import { formatDateTime } from "../../../utils/dateFormatter";
 const RECENT_INSPECTIONS = [
   { id: "INS-0481", treeCode: "TR-0041", date: "2026-07-03", inspector: "John Smith", status: "Healthy" },
   { id: "INS-0480", treeCode: "TR-0158", date: "2026-07-03", inspector: "Emily Davis", status: "Warning" },
@@ -82,7 +83,7 @@ export default function DashboardTables() {
                 <td className="px-6 text-sm font-semibold text-gray-950 truncate">{row.id}</td>
                 <td className="px-6 text-sm font-medium text-gray-600 truncate">{row.treeCode}</td>
                 <td className="px-6 text-sm font-medium text-gray-600 truncate">{row.inspector}</td>
-                <td className="px-6 text-sm font-medium text-gray-600 truncate">{row.date}</td>
+                <td className="px-6 text-sm font-medium text-gray-600 truncate">{formatDateTime(row.date)}</td>
                 <td className="px-6 text-sm font-semibold truncate">
                   <span className={`px-2 py-1 rounded-[6px] text-[10px] font-bold ${getBadgeClass(row.status)}`}>
                     {row.status}
@@ -113,7 +114,7 @@ export default function DashboardTables() {
                 <td className="px-6 text-sm font-medium text-gray-600 truncate">{row.treeCode}</td>
                 <td className="px-6 text-sm font-medium text-gray-600 truncate">{row.disease}</td>
                 <td className="px-6 text-sm font-bold text-gray-800 truncate">{row.confidence}</td>
-                <td className="px-6 text-sm font-medium text-gray-600 truncate">{row.date}</td>
+                <td className="px-6 text-sm font-medium text-gray-600 truncate">{formatDateTime(row.date)}</td>
               </tr>
             ))}
           </tbody>
@@ -143,7 +144,7 @@ export default function DashboardTables() {
                     {row.status}
                   </span>
                 </td>
-                <td className="px-6 text-sm font-medium text-gray-600 truncate">{row.date}</td>
+                <td className="px-6 text-sm font-medium text-gray-600 truncate">{formatDateTime(row.date)}</td>
               </tr>
             ))}
           </tbody>

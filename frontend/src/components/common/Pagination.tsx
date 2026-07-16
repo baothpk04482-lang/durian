@@ -48,12 +48,12 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3">
       <div className="text-[12px] text-gray-500 font-medium tabular-nums">
-        Showing <span className="font-semibold text-gray-700">{startItem.toLocaleString()}</span>
+        Hiển thị <span className="font-semibold text-gray-700">{startItem.toLocaleString()}</span>
         <span className="mx-0.5">–</span>
         <span className="font-semibold text-gray-700">{endItem.toLocaleString()}</span>
-        {" "}<span className="mx-1">of</span>{" "}
+        {" "}<span className="mx-1">trên</span>{" "}
         <span className="font-semibold text-gray-700">{total.toLocaleString()}</span>
-        {" "}<span className="ml-1">items</span>
+        {" "}<span className="ml-1">mục</span>
       </div>
 
       <div className="flex items-center gap-1">
@@ -61,7 +61,7 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
           onClick={() => onChange(1)}
           disabled={page <= 1}
           type="button"
-          aria-label="Go to first page"
+          aria-label="Đến trang đầu"
           className={`${btnBase} ${btnInactive} ${page <= 1 ? btnDisabled : ""}`}
         >
           <ChevronsLeft className="w-4 h-4" />
@@ -70,7 +70,7 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
           onClick={() => onChange(page - 1)}
           disabled={page <= 1}
           type="button"
-          aria-label="Go to previous page"
+          aria-label="Trang trước"
           className={`${btnBase} ${btnInactive} ${page <= 1 ? btnDisabled : ""}`}
         >
           <ChevronLeft className="w-4 h-4" />
@@ -86,7 +86,7 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
               key={p}
               onClick={() => onChange(p)}
               type="button"
-              aria-label={`Go to page ${p}`}
+              aria-label={`Đến trang ${p}`}
               className={`${btnBase} ${p === page ? btnActive : btnInactive}`}
             >
               {p}
@@ -98,7 +98,7 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
           onClick={() => onChange(page + 1)}
           disabled={page >= totalPages}
           type="button"
-          aria-label="Go to next page"
+          aria-label="Trang sau"
           className={`${btnBase} ${btnInactive} ${page >= totalPages ? btnDisabled : ""}`}
         >
           <ChevronRight className="w-4 h-4" />
@@ -107,7 +107,7 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
           onClick={() => onChange(totalPages)}
           disabled={page >= totalPages}
           type="button"
-          aria-label="Go to last page"
+          aria-label="Đến trang cuối"
           className={`${btnBase} ${btnInactive} ${page >= totalPages ? btnDisabled : ""}`}
         >
           <ChevronsRight className="w-4 h-4" />

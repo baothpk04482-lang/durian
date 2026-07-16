@@ -20,6 +20,7 @@ import RealtimeInspectionCard from "../../components/dashboard/RealtimeInspectio
 import { DashboardSkeleton } from "../../components/dashboard/Shared/SkeletonCard";
 import type { CellData, ZoneSection } from "../../components/dashboard/HeatmapGrid";
 import type { InspectionRow } from "../../components/dashboard/InspectionTable";
+import { formatDateTime } from "../../utils/dateFormatter";
 
 export default function DashboardPage() {
   const [trees, setTrees] = useState<Tree[]>([]);
@@ -69,17 +70,9 @@ export default function DashboardPage() {
   }, []);
 
   // --- KPI computations ---
-  const healthyPercent = kpiTotalTrees > 0 ? Math.round((kpiHealthyCount / kpiTotalTrees) * 100) : 0;
-
-  const highAlertTreeIds = [...new Set(alerts.filter((a) => a.tree_id && (a.priority || "").toLowerCase() === "high").map((a) => a.tree_id as string))];
-  const emergencyCount = kpiEmergencyCount > 0 ? kpiEmergencyCount : highAlertTreeIds.length;
+  void kpiTotalTrees; void kpiHealthyCount; void kpiMonitoringCount; void kpiDiseasedCount; void kpiEmergencyCount;
 
   const newTreesThisMonth = 0;
-
-  const kpiFarmCount = farms.length;
-  const kpiZoneCount = zones.length;
-  const farmArea = farms.reduce((sum, f) => sum + (f.area_hectare || 0), 0);
-  const kpiFarmAreaFormatted = `${farmArea.toFixed(1)} ha`;
 
   // --- Zone / Farm lookup maps ---
   const zoneMap = useMemo(() => {
@@ -108,12 +101,12 @@ export default function DashboardPage() {
 
   // --- Filters ---
   const farmOptions = useMemo(() => {
-    return [{ value: "all", label: "All Farms" }, ...farms.map((f) => ({ value: f._id, label: f.farm_name }))];
+    return [{ value: "all", label: "Tất cả trang trại" }, ...farms.map((f) => ({ value: f._id, label: f.farm_name }))];
   }, [farms]);
 
   const zoneOptions = useMemo(() => {
     const filtered = farmFilter === "all" ? zones : zones.filter((z) => z.farm_id === farmFilter);
-    return [{ value: "all", label: "All Zones" }, ...filtered.map((z) => ({ value: z._id, label: z.zone_name }))];
+    return [{ value: "all", label: "Tất cả khu vực" }, ...filtered.map((z) => ({ value: z._id, label: z.zone_name }))];
   }, [zones, farmFilter]);
 
   const filteredTrees = useMemo(() => {
@@ -128,6 +121,44 @@ export default function DashboardPage() {
       return true;
     });
   }, [trees, farmFilter, zoneFilter, zoneMap]);
+
+  // --- Filtered KPIs (derived from filteredTrees) ---
+  const filteredKpiTotalTrees = filteredTrees.length;
+  const filteredKpiHealthyCount = filteredTrees.filter((t) => t.status === "Healthy").length;
+  const filteredKpiMonitoringCount = filteredTrees.filter((t) => t.status === "Monitoring").length;
+  const filteredKpiDiseasedCount = filteredTrees.filter((t) => t.status !== "Healthy" && t.status !== "Monitoring").length;
+  const filteredHealthyPercent = filteredKpiTotalTrees > 0 ? Math.round((filteredKpiHealthyCount / filteredKpiTotalTrees) * 100) : 0;
+
+  // Unique farms/zones from filtered trees
+  const filteredFarmIds = useMemo(() => {
+    const ids = new Set<string>();
+    filteredTrees.forEach((t) => {
+      const zone = zoneMap.get(t.zone_id);
+      if (zone) ids.add(zone.farm_id);
+    });
+    return ids;
+  }, [filteredTrees, zoneMap]);
+
+  const filteredZoneIds = useMemo(() => {
+    const ids = new Set<string>();
+    filteredTrees.forEach((t) => ids.add(t.zone_id));
+    return ids;
+  }, [filteredTrees]);
+
+  const filteredFarmCount = filteredFarmIds.size;
+  const filteredZoneCount = filteredZoneIds.size;
+  const filteredFarmArea = useMemo(() => {
+    let area = 0;
+    filteredFarmIds.forEach((fid) => {
+      const farm = farmMap.get(fid);
+      if (farm) area += farm.area_hectare || 0;
+    });
+    return area;
+  }, [filteredFarmIds, farmMap]);
+  const filteredFarmAreaFormatted = `${filteredFarmArea.toFixed(1)} ha`;
+
+  // Tree IDs in the filtered set (for quick lookup)
+  const filteredTreeIds = useMemo(() => new Set(filteredTrees.map((t) => t._id)), [filteredTrees]);
 
   const detectionMap = useMemo(() => {
     const m = new Map<string, DetectionResult>();
@@ -156,7 +187,7 @@ export default function DashboardPage() {
 
     for (const t of filteredTrees) {
       const zone = zoneMap.get(t.zone_id);
-      const zoneName = zone?.zone_name || t.zone_name || t.zone_id || "Unknown";
+      const zoneName = zone?.zone_name || t.zone_name || t.zone_id || "Chưa xác định";
       const g = nameGroups.get(zoneName);
       if (g) g.push(t);
       else nameGroups.set(zoneName, [t]);
@@ -200,46 +231,6 @@ export default function DashboardPage() {
     return sections;
   }, [filteredTrees, zoneMap, detectionMap]);
 
-  // --- Priority Trees ---
-  const priorityTrees = useMemo(() => {
-    if (detections.length === 0) return [];
-    return detections
-      .map((d) => {
-        const inspection = inspectionMap.get(d.inspection_id);
-        const tree = inspection ? treeMap.get(inspection.tree_id) : undefined;
-        const confidence = Math.round(d.confidence);
-
-        const zone = tree ? zoneMap.get(tree.zone_id) : undefined;
-        const zoneName = zone?.zone_name || tree?.zone_name || "—";
-
-        const farmId = zone?.farm_id;
-        const farm = farmId ? farmMap.get(farmId) : undefined;
-        const farmName = farm?.farm_name || tree?.farm_name || "—";
-
-        const treeCode = tree?.tree_code || "Tree unavailable";
-        const prediction = (d as unknown as Record<string, unknown>).prediction as string | undefined;
-        const disease = prediction || d.disease_name || "Healthy";
-
-        return {
-          id: 0,
-          treeId: treeCode,
-          riskScore: confidence,
-          status: confidence >= 90 ? "Critical" : confidence >= 80 ? "Warning" : "Healthy",
-          farm: farmName,
-          zone: zoneName,
-          disease,
-        };
-      })
-      .sort((a, b) => b.riskScore - a.riskScore)
-      .slice(0, 5)
-      .map((row, i) => ({ ...row, id: i + 1 }));
-  }, [detections, inspectionMap, treeMap, zoneMap, farmMap]);
-
-  const highRiskCount = useMemo(
-    () => detections.filter((d) => Math.round(d.confidence) >= 90).length,
-    [detections],
-  );
-
   // Last updated from real data
   const heatmapLastUpdated = useMemo(() => {
     const dates = [
@@ -248,17 +239,17 @@ export default function DashboardPage() {
     ] as string[];
     if (dates.length === 0) return "09:30 AM";
     const latest = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
-    return new Date(latest).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    return formatDateTime(latest);
   }, [inspections, detections]);
 
   // Farm Health Distribution
-  const farmHealthData = useMemo(() => {
+  const filteredFarmHealthData = useMemo(() => {
     return [
-      { name: "Healthy", value: kpiHealthyCount, color: "#22C55E" },
-      { name: "Monitoring", value: kpiMonitoringCount, color: "#EAB308" },
-      { name: "Diseased", value: kpiDiseasedCount, color: "#EF4444" },
+      { name: "Khỏe mạnh", value: filteredKpiHealthyCount, color: "#22C55E" },
+      { name: "Theo dõi", value: filteredKpiMonitoringCount, color: "#EAB308" },
+      { name: "Bị bệnh", value: filteredKpiDiseasedCount, color: "#EF4444" },
     ];
-  }, [kpiHealthyCount, kpiMonitoringCount, kpiDiseasedCount]);
+  }, [filteredKpiHealthyCount, filteredKpiMonitoringCount, filteredKpiDiseasedCount]);
 
   // Inspection table data — O(n) join using pre-built lookup maps
   const inspectionTableData: InspectionRow[] = useMemo(() => {
@@ -277,16 +268,16 @@ export default function DashboardPage() {
       const det = detectionMap.get(insp.tree_id);
 
       const risk = det?.confidence ?? 0;
-      const action = risk >= 90 ? "Inspect Today" : risk >= 80 ? "Monitor" : "Review";
+        const action = risk >= 90 ? "Khám hôm nay" : risk >= 80 ? "Theo dõi" : "Xem xét";
 
       let time = "—";
       const dateRaw = insp.inspection_date;
       const createdRaw = insp.created_at;
       const raw = dateRaw && dateRaw.includes("T") ? dateRaw : createdRaw;
       if (raw) {
-        const d = new Date(raw);
-        if (!isNaN(d.getTime())) {
-          time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+        const formatted = formatDateTime(raw);
+        if (formatted !== "-") {
+          time = formatted;
         }
       }
 
@@ -296,7 +287,7 @@ export default function DashboardPage() {
         treeCode: tree?.tree_code || insp.tree_code || "—",
         farm: farm?.farm_name || "—",
         zone: zone?.zone_name || "—",
-        disease: det?.disease_name || "Not Detected",
+        disease: det?.disease_name || "Chưa phát hiện",
         risk,
         inspector: insp.inspector_name || "—",
         status: insp.status || "—",
@@ -313,6 +304,155 @@ export default function DashboardPage() {
     return { high, medium, low };
   }, [alerts]);
 
+  // --- Filtered inspection table data ---
+  // Filter inspections BEFORE the join, using tree→zone→farm
+  const filteredInspectionRows: InspectionRow[] = useMemo(() => {
+    if (farmFilter === "all" && zoneFilter === "all") return inspectionTableData;
+
+    const sorted = [...inspections]
+      .filter((i) => i.inspection_date || i.created_at)
+      .sort((a, b) => {
+        const da = new Date(a.inspection_date || a.created_at || 0).getTime();
+        const db = new Date(b.inspection_date || b.created_at || 0).getTime();
+        return db - da;
+      });
+
+    const filtered = sorted.filter((insp) => {
+      const tree = treeMap.get(insp.tree_id);
+      if (!tree) return false;
+      if (farmFilter !== "all") {
+        const zone = zoneMap.get(tree.zone_id);
+        if (!zone || zone.farm_id !== farmFilter) return false;
+      }
+      if (zoneFilter !== "all" && tree.zone_id !== zoneFilter) return false;
+      return true;
+    });
+
+    return filtered.map((insp) => {
+      const tree = treeMap.get(insp.tree_id);
+      const zone = tree ? zoneMap.get(tree.zone_id) : undefined;
+      const farm = zone ? farmMap.get(zone.farm_id) : undefined;
+      const det = detectionMap.get(insp.tree_id);
+
+      const risk = det?.confidence ?? 0;
+      const action = risk >= 90 ? "Khám hôm nay" : risk >= 80 ? "Theo dõi" : "Xem xét";
+
+      let time = "—";
+      const dateRaw = insp.inspection_date;
+      const createdRaw = insp.created_at;
+      const raw = dateRaw && dateRaw.includes("T") ? dateRaw : createdRaw;
+      if (raw) {
+        const formatted = formatDateTime(raw);
+        if (formatted !== "-") {
+          time = formatted;
+        }
+      }
+
+      return {
+        id: insp._id,
+        time,
+        treeCode: tree?.tree_code || insp.tree_code || "—",
+        farm: farm?.farm_name || "—",
+        zone: zone?.zone_name || "—",
+        disease: det?.disease_name || "Chưa phát hiện",
+        risk,
+        inspector: insp.inspector_name || "—",
+        status: insp.status || "—",
+        action,
+      };
+    });
+  }, [inspections, treeMap, zoneMap, farmMap, detectionMap, farmFilter, zoneFilter, inspectionTableData]);
+
+  // --- Filtered detections ---
+  const filteredDetections = useMemo(() => {
+    if (farmFilter === "all" && zoneFilter === "all") return detections;
+    return detections.filter((d) => {
+      const inspection = inspectionMap.get(d.inspection_id);
+      const tree = inspection ? treeMap.get(inspection.tree_id) : undefined;
+      if (!tree) return false;
+      if (farmFilter !== "all") {
+        const zone = zoneMap.get(tree.zone_id);
+        if (!zone || zone.farm_id !== farmFilter) return false;
+      }
+      if (zoneFilter !== "all" && tree.zone_id !== zoneFilter) return false;
+      return true;
+    });
+  }, [detections, inspectionMap, treeMap, zoneMap, farmFilter, zoneFilter]);
+
+  // --- Filtered priority trees (top 5 from filtered detections) ---
+  const filteredPriorityTrees = useMemo(() => {
+    if (filteredDetections.length === 0) return [];
+    return filteredDetections
+      .map((d) => {
+        const inspection = inspectionMap.get(d.inspection_id);
+        const tree = inspection ? treeMap.get(inspection.tree_id) : undefined;
+        const confidence = Math.round(d.confidence);
+
+        const zone = tree ? zoneMap.get(tree.zone_id) : undefined;
+        const zoneName = zone?.zone_name || tree?.zone_name || "—";
+
+        const farmId = zone?.farm_id;
+        const farm = farmId ? farmMap.get(farmId) : undefined;
+        const farmName = farm?.farm_name || tree?.farm_name || "—";
+
+        const treeCode = tree?.tree_code || "Chưa có dữ liệu";
+        const prediction = (d as unknown as Record<string, unknown>).prediction as string | undefined;
+        const disease = prediction || d.disease_name || "Khỏe mạnh";
+
+        return {
+          id: 0,
+          treeId: treeCode,
+          riskScore: confidence,
+          status: confidence >= 90 ? "Nghiêm trọng" : confidence >= 80 ? "Cảnh báo" : "Khỏe mạnh",
+          farm: farmName,
+          zone: zoneName,
+          disease,
+        };
+      })
+      .sort((a, b) => b.riskScore - a.riskScore)
+      .slice(0, 5)
+      .map((row, i) => ({ ...row, id: i + 1 }));
+  }, [filteredDetections, inspectionMap, treeMap, zoneMap, farmMap]);
+
+  const filteredHighRiskCount = useMemo(
+    () => filteredDetections.filter((d) => Math.round(d.confidence) >= 90).length,
+    [filteredDetections],
+  );
+
+  // --- Filtered alert counts ---
+  const filteredAlertCounts = useMemo(() => {
+    if (farmFilter === "all" && zoneFilter === "all") return alertCounts;
+
+    const filteredAlerts = alerts.filter((a) => {
+      if (!a.tree_id) return true; // system alerts — always show
+      const tree = treeMap.get(a.tree_id);
+      if (!tree) return false;
+      if (farmFilter !== "all") {
+        const zone = zoneMap.get(tree.zone_id);
+        if (!zone || zone.farm_id !== farmFilter) return false;
+      }
+      if (zoneFilter !== "all" && tree.zone_id !== zoneFilter) return false;
+      return true;
+    });
+
+    const high = filteredAlerts.filter((a) => (a.priority || "").toLowerCase() === "high").length;
+    const medium = filteredAlerts.filter((a) => (a.priority || "").toLowerCase() === "medium").length;
+    const low = filteredAlerts.filter((a) => (a.priority || "").toLowerCase() === "low").length;
+    return { high, medium, low };
+  }, [alerts, farmFilter, zoneFilter, treeMap, zoneMap, alertCounts]);
+
+  const filteredEmergencyCount = useMemo(() => {
+    const highAlertTreeIdsFiltered = [
+      ...new Set(
+        alerts
+          .filter((a) => a.tree_id && (a.priority || "").toLowerCase() === "high")
+          .map((a) => a.tree_id as string)
+          .filter((tid) => filteredTreeIds.has(tid))
+      ),
+    ];
+    return highAlertTreeIdsFiltered.length;
+  }, [alerts, filteredTreeIds]);
+
   // Reset zone filter when farm changes
   useEffect(() => {
     setZoneFilter("all");
@@ -320,12 +460,12 @@ export default function DashboardPage() {
 
   // Farm status
   const farmStatus = useMemo(() => {
-    if (priorityTrees.length === 0) return "Healthy";
-    const maxConfidence = Math.max(...priorityTrees.map((t) => t.riskScore));
+    if (filteredPriorityTrees.length === 0) return "Healthy";
+    const maxConfidence = Math.max(...filteredPriorityTrees.map((t) => t.riskScore));
     if (maxConfidence >= 90) return "Critical";
     if (maxConfidence >= 80) return "Warning";
     return "Healthy";
-  }, [priorityTrees]);
+  }, [filteredPriorityTrees]);
 
   return (
     <div className="flex flex-col bg-[#F5F7FB]" style={{ gap: "20px", flex: "1 1 0%", minHeight: 0 }}>
@@ -343,13 +483,13 @@ export default function DashboardPage() {
         <div className="flex flex-col lg:grid lg:grid-cols-3 gap-5" style={{ gridTemplateRows: "auto 520px 420px" }}>
           <div className="lg:col-span-3">
             <KPISection
-              totalTrees={kpiTotalTrees}
+              totalTrees={filteredKpiTotalTrees}
               newTreesThisMonth={newTreesThisMonth}
-              healthyPercent={healthyPercent}
-              farmArea={kpiFarmAreaFormatted}
-              farmCount={kpiFarmCount}
-              zoneCount={kpiZoneCount}
-              emergencyCount={emergencyCount}
+              healthyPercent={filteredHealthyPercent}
+              farmArea={filteredFarmAreaFormatted}
+              farmCount={filteredFarmCount}
+              zoneCount={filteredZoneCount}
+              emergencyCount={filteredEmergencyCount}
             />
           </div>
           <WeatherForecastCard />
@@ -367,17 +507,17 @@ export default function DashboardPage() {
           />
           <div className="lg:row-span-2">
             <AgronomistPanel
-              priorityTrees={priorityTrees}
+              priorityTrees={filteredPriorityTrees}
               farmStatus={farmStatus}
-              kpiHealthyCount={kpiHealthyCount}
-              kpiMonitoringCount={kpiMonitoringCount}
-              kpiDiseasedCount={kpiDiseasedCount}
-              alertCounts={alertCounts}
-              highRiskCount={highRiskCount}
+              kpiHealthyCount={filteredKpiHealthyCount}
+              kpiMonitoringCount={filteredKpiMonitoringCount}
+              kpiDiseasedCount={filteredKpiDiseasedCount}
+              alertCounts={filteredAlertCounts}
+              highRiskCount={filteredHighRiskCount}
             />
           </div>
-          <TreeDistributionCard data={farmHealthData} total={kpiTotalTrees} />
-          <RealtimeInspectionCard data={inspectionTableData} onRefresh={fetchDashboardData} />
+          <TreeDistributionCard data={filteredFarmHealthData} total={filteredKpiTotalTrees} />
+          <RealtimeInspectionCard data={filteredInspectionRows} onRefresh={fetchDashboardData} />
         </div>
       )}
     </div>

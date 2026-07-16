@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
+import { vi, INSPECTION_STATUS_VI } from "../../utils/translate";
 
 export interface InspectionRow {
   id: string;
@@ -25,8 +26,8 @@ function riskBadge(score: number): string {
 }
 
 function actionBadge(action: string): string {
-  if (action === "Inspect Today") return "bg-red-100 text-red-700";
-  if (action === "Monitor") return "bg-amber-100 text-amber-700";
+  if (action === "Khám hôm nay") return "bg-red-100 text-red-700";
+  if (action === "Theo dõi") return "bg-amber-100 text-amber-700";
   return "bg-gray-100 text-gray-600";
 }
 
@@ -40,6 +41,10 @@ function statusBadge(status: string): string {
   return "bg-gray-100 text-gray-700";
 }
 
+function statusLabel(status: string): string {
+  return vi(INSPECTION_STATUS_VI, status) || status;
+}
+
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -48,7 +53,7 @@ function EmptyState() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       </div>
-      <p className="text-[13px] font-semibold text-gray-400">No inspections found</p>
+      <p className="text-[13px] font-semibold text-gray-400">Chưa có dữ liệu kiểm tra.</p>
     </div>
   );
 }
@@ -59,19 +64,19 @@ function InspectionTableInner({ data }: InspectionTableProps) {
   if (data.length === 0) return <EmptyState />;
 
   return (
-    <div className="overflow-x-auto" role="table" aria-label="Inspection records">
+    <div className="overflow-x-auto" role="table" aria-label="Bản ghi kiểm tra">
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-gray-200 sticky top-0 bg-white z-10">
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[60px]">Time</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[80px]">Tree Code</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[90px]">Farm</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[80px]">Zone</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[90px]">Disease</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[55px]">Risk %</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[80px]">Inspector</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[75px]">Status</th>
-            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[85px]">Action</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[60px]">Thời gian</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[80px]">Tree Digital ID</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[90px]">Trang trại</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[80px]">Khu vực</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[90px]">Kết quả AI</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[55px]">Risk Index</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[80px]">Người kiểm tra</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[75px]">Trạng thái</th>
+            <th className="text-left text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] pb-2 px-1 w-[85px]">Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -100,7 +105,7 @@ function InspectionTableInner({ data }: InspectionTableProps) {
                 <td className="text-[13px] text-gray-600 whitespace-nowrap px-1 py-1.5">{row.inspector}</td>
                 <td className="px-1 py-1.5">
                   <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${statusBadge(row.status)}`}>
-                    {row.status}
+                    {statusLabel(row.status)}
                   </span>
                 </td>
                 <td className="px-1 py-1.5">
