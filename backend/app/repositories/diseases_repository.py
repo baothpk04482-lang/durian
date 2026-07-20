@@ -30,3 +30,10 @@ class DiseasesRepository(BaseRepository):
 
     async def get_by_id(self, id: str) -> dict[str, Any] | None:
         return await self.get(id)
+
+    async def exists_by_code(self, code: str, exclude_id: str | None = None) -> bool:
+        query: dict[str, Any] = {"code": code}
+        if exclude_id:
+            from bson import ObjectId
+            query["_id"] = {"$ne": ObjectId(exclude_id)}
+        return await self.collection.find_one(query) is not None

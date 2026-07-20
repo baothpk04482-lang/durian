@@ -39,9 +39,7 @@ class DiseaseService:
         return serialize_disease(result)
 
     async def create_disease(self, data: DiseaseCreate) -> dict:
-        # Check uniqueness of code
-        existing = await self.db["diseases"].find_one({"code": data.code})
-        if existing:
+        if await self.repo.exists_by_code(data.code):
             raise BadRequestException(f"Disease code '{data.code}' already exists")
 
         disease_doc = {
@@ -68,8 +66,7 @@ class DiseaseService:
 
         # Check uniqueness of code if changing
         if data.code is not None and data.code != result.get("code"):
-            existing = await self.db["diseases"].find_one({"code": data.code})
-            if existing:
+            if await self.repo.exists_by_code(data.code, exclude_id=id):
                 raise BadRequestException(f"Disease code '{data.code}' already exists")
 
         update_data = {}

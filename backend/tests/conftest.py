@@ -53,15 +53,15 @@ async def test_user_token(db: AsyncIOMotorDatabase) -> tuple[str, str]:
     await db["users"].insert_one(
         {
             "_id": ObjectId(user_id),
-            "fullname": "Test Farmer",
+            "full_name": "Test Farmer",
             "email": "farmer@test.com",
             "password_hash": hash_password("testpass123"),
-            "role": "farmer",
+            "role": "Technician",
             "created_at": now,
             "updated_at": now,
         }
     )
-    token = create_access_token(sub=user_id, role="farmer")
+    token = create_access_token(sub=user_id, role="Technician")
     return token, user_id
 
 

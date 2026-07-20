@@ -9,6 +9,12 @@ class TreeRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         super().__init__(db, "trees")
 
+    async def exists_by_id(self, tree_id: str) -> bool:
+        from bson import ObjectId
+        if not ObjectId.is_valid(tree_id):
+            return False
+        return await self.collection.find_one({"_id": ObjectId(tree_id)}) is not None
+
     def _build_enrichment_stages(self) -> list[dict]:
         return [
             {
@@ -166,6 +172,14 @@ class TreeRepository(BaseRepository):
 
     async def get_by_code(self, tree_code: str) -> dict | None:
         doc = await self.collection.find_one({"tree_code": tree_code})
+        if doc:
+            return self._serialize(doc)
+        return None
+
+    async def get_first_by_zone(self, zone_id: str) -> dict | None:
+        from bson import ObjectId
+        zone_oid = ObjectId(zone_id) if ObjectId.is_valid(zone_id) else zone_id
+        doc = await self.collection.find_one({"zone_id": zone_oid})
         if doc:
             return self._serialize(doc)
         return None

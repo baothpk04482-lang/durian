@@ -32,8 +32,17 @@ class RiskTrendItem(BaseModel):
     avg_risk: float
 
 
+class SystemOverview(BaseModel):
+    inspection_today: int
+    ai_detection_today: int
+    new_alerts_today: int
+    pending_review: int
+    updated_at: datetime
+
+
 class DashboardOut(BaseModel):
     kpi: KpiData
+    system_overview: SystemOverview
     recent_detection: list[DetectionBrief]
     alerts: list[AlertBrief]
     risk_trend: list[RiskTrendItem]

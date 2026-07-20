@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "Durian Guardian AI"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     MONGODB_URL: str = "mongodb://localhost:27017"
     MONGODB_DB_NAME: str = "durian_guardian_ai"
@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     @property
     def MAX_UPLOAD_SIZE_BYTES(self) -> int:
         return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+
+    def model_post_init(self, __context: object) -> None:
+        if self.JWT_SECRET_KEY == "change-this-to-a-secure-random-string":
+            import os
+            if os.getenv("ENVIRONMENT", "development").lower() == "production":
+                raise ValueError(
+                    "JWT_SECRET_KEY must be set to a secure value in production. "
+                    "Set the JWT_SECRET_KEY environment variable."
+                )
 
 
 settings = Settings()

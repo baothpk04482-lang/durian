@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.exceptions import NotFoundException, BadRequestException
 from app.repositories.detection_result_repository import DetectionResultRepository
+from app.repositories.inspection_repository import InspectionRepository
 from app.schemas.detection_result import DetectionResultCreate, DetectionResultUpdate
 
 logger = logging.getLogger(__name__)
@@ -24,12 +25,10 @@ class DetectionResultService:
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self.db = db
         self.repo = DetectionResultRepository(db)
+        self.inspection_repo = InspectionRepository(db)
 
     async def _validate_inspection(self, inspection_id: str) -> None:
-        if not ObjectId.is_valid(inspection_id):
-            raise BadRequestException("Invalid inspection_id format")
-        inspection = await self.db["inspections"].find_one({"_id": ObjectId(inspection_id)})
-        if not inspection:
+        if not await self.inspection_repo.exists_by_id(inspection_id):
             raise BadRequestException(f"Inspection with ID '{inspection_id}' does not exist")
 
     async def list_detection_results(

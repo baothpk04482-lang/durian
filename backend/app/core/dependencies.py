@@ -12,6 +12,7 @@ from app.core.exceptions import (
 )
 from app.core.security import decode_token
 from app.database.mongodb import get_database
+from app.models.enums import db_role_to_api
 
 security = HTTPBearer(auto_error=False)
 
@@ -40,14 +41,7 @@ def get_current_user_role(
     role = payload.get("role")
     if role is None:
         raise UnauthorizedException("Invalid or expired token")
-    
-    role_map = {
-        "Admin": "enterprise_admin",
-        "Manager": "farm_manager",
-        "Inspector": "field_technician",
-        "Farmer": "farmer"
-    }
-    return role_map.get(role, role)
+    return db_role_to_api(role)
 
 
 CurrentUserRole = Annotated[str, Depends(get_current_user_role)]

@@ -27,7 +27,6 @@ import logging
 import math
 import sys
 import time
-from collections import Counter, defaultdict
 from datetime import datetime, date, timezone
 from typing import Dict, List, Optional, Tuple, Any
 import pandas as pd
@@ -82,85 +81,167 @@ def _setup_logging(verbose: bool = False) -> None:
 
 # ── Excel Extraction ───────────────────────────────────────────────────
 
-def extract_excel() -> List[Dict[str, str]]:
-    """Read Excel file sheets and join them to reconstruct the flat rows."""
-    excel_path =  r"D:\data\DGA_Enterprise_Dataset.xlsx"
-    logger.info("Extracting data from Excel: %s", excel_path)
-    
-    # Read sheets
-    companies_df = pd.read_excel(excel_path, sheet_name="companies")
-    farms_df = pd.read_excel(excel_path, sheet_name="farms")
-    zones_df = pd.read_excel(excel_path, sheet_name="zones")
-    trees_df = pd.read_excel(excel_path, sheet_name="trees")
-    inspections_df = pd.read_excel(excel_path, sheet_name="inspections")
-    
-    # Rename tree_count in farms and zones to avoid naming conflict
-    farms_df = farms_df.rename(columns={"tree_count": "farm_tree_count"})
-    zones_df = zones_df.rename(columns={"tree_count": "zone_tree_count"})
-    
-    # Standardize column types and strip strings
-    for df in [companies_df, farms_df, zones_df, trees_df, inspections_df]:
-        for col in df.columns:
-            if df[col].dtype == object:
-                df[col] = df[col].astype(str).str.strip()
-                
-    # 1. Join trees with farms to get farm_name and company_code
-    trees_farms = pd.merge(trees_df, farms_df, on="farm_code", how="left")
-    # Join with zones to get zone_tree_count
-    trees_farms = pd.merge(trees_farms, zones_df, on=["farm_code", "zone_name"], how="left")
-    
-    # 2. Join with companies to get company_name (company) and company's province/district
-    trees_farms_comp = pd.merge(trees_farms, companies_df, on="company_code", how="left", suffixes=('', '_comp'))
-    
-    # 3. Join inspections with trees_farms_comp on tree_code
-    flat_df = pd.merge(inspections_df, trees_farms_comp, on="tree_code", how="left", suffixes=('_insp', ''))
-    
+
+class ExcelExtract:
+    """Structured result of extract_excel().
+
+    Provides individual DataFrames for each sheet (primary API) and
+    backward-compatible iteration over inspection-joined flat rows
+    so that existing callers work without modification.
+    """
+
+    def __init__(
+        self,
+        companies_df: pd.DataFrame,
+        farms_df: pd.DataFrame,
+        zones_df: pd.DataFrame,
+        trees_df: pd.DataFrame,
+        inspections_df: pd.DataFrame,
+        flat_rows: List[Dict[str, str]],
+    ) -> None:
+        self.companies_df = companies_df
+        self.farms_df = farms_df
+        self.zones_df = zones_df
+        self.trees_df = trees_df
+        self.inspections_df = inspections_df
+        self._flat_rows = flat_rows
+
+    # ── backward-compat: len(extract_excel()) ──────────────────────────
+    def __len__(self) -> int:
+        return len(self._flat_rows)
+
+    # ── backward-compat: for r in extract_excel() ──────────────────────
+    def __iter__(self):
+        return iter(self._flat_rows)
+
+
+def _read_sheet(excel_path: str, sheet_name: str) -> pd.DataFrame:
+    """Read a single sheet and strip string columns."""
+    df = pd.read_excel(excel_path, sheet_name=sheet_name)
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].astype(str).str.strip()
+    return df
+
+
+def _build_flat_rows(
+    inspections_df: pd.DataFrame,
+    trees_farms_comp: pd.DataFrame,
+) -> List[Dict[str, str]]:
+    """Build inspection-joined flat rows for backward compatibility.
+
+    This preserves the exact dict structure expected by all existing
+    transform_* functions.  It will be removed once those functions
+    are refactored to consume individual DataFrames directly.
+    """
+    flat_df = pd.merge(
+        inspections_df,
+        trees_farms_comp,
+        on="tree_code",
+        how="left",
+        suffixes=("_insp", ""),
+    )
+
     def clean_val(v):
         if pd.isna(v):
             return ""
         if isinstance(v, (datetime, pd.Timestamp)):
             return v.strftime("%Y-%m-%d")
         return str(v).strip()
-        
-    # Map columns to match the 20 keys expected by etl_pipeline
-    flat_rows = []
-    for idx, row in flat_df.iterrows():
+
+    flat_rows: List[Dict[str, str]] = []
+    for _, row in flat_df.iterrows():
         province = clean_val(row.get("province", "Đắk Lắk"))
         district = clean_val(row.get("district", ""))
         district_str = f"{province} - {district}" if district else province
-        
-        flat_row = {
-            "company": clean_val(row.get("company_name", "")),
-            "company_code": clean_val(row.get("company_code", "")),
-            "district": district_str,
-            "farm_id": clean_val(row.get("farm_code", "")),
-            "farm_name": clean_val(row.get("farm_name", "")),
-            "farm_tree_count": clean_val(row.get("farm_tree_count", "")),
-            "zone": clean_val(row.get("zone_name", "")),
-            "zone_tree_count": clean_val(row.get("zone_tree_count", "")),
-            "tree_code": clean_val(row.get("tree_code", "")),
-            "variety": clean_val(row.get("variety", "")),
-            "planting_date": clean_val(row.get("planting_date", "")),
-            "tree_age": clean_val(row.get("tree_age", "")),
-            "tree_status": clean_val(row.get("status", "")),
-            "status": clean_val(row.get("health_status", "")),
-            "latitude": "",
-            "longitude": "",
-            "inspection_date": clean_val(row.get("inspection_date", "")),
-            "disease": clean_val(row.get("predicted_disease", "")),
-            "confidence": clean_val(row.get("confidence", "")),
-            "temperature": clean_val(row.get("temperature", "")),
-            "humidity": clean_val(row.get("humidity", "")),
-            "rainfall_mm": clean_val(row.get("rainfall", "")),
-            "wind_speed": "",
-            "severity": "",
-            "inspection_id": clean_val(row.get("inspection_code", "")),
-            "area_hectare": clean_val(row.get("area_hectare", "")),
-        }
-        flat_rows.append(flat_row)
-        
-    logger.info("Extracted %d rows from Excel sheets", len(flat_rows))
+
+        flat_rows.append(
+            {
+                "company": clean_val(row.get("company_name", "")),
+                "company_code": clean_val(row.get("company_code", "")),
+                "district": district_str,
+                "farm_id": clean_val(row.get("farm_code", "")),
+                "farm_name": clean_val(row.get("farm_name", "")),
+                "farm_tree_count": clean_val(row.get("farm_tree_count", "")),
+                "zone": clean_val(row.get("zone_name", "")),
+                "zone_tree_count": clean_val(row.get("zone_tree_count", "")),
+                "tree_code": clean_val(row.get("tree_code", "")),
+                "variety": clean_val(row.get("variety", "")),
+                "planting_date": clean_val(row.get("planting_date", "")),
+                "tree_age": clean_val(row.get("tree_age", "")),
+                "tree_status": clean_val(row.get("status", "")),
+                "status": clean_val(row.get("health_status", "")),
+                "latitude": "",
+                "longitude": "",
+                "inspection_date": clean_val(row.get("inspection_date", "")),
+                "disease": clean_val(row.get("predicted_disease", "")),
+                "confidence": clean_val(row.get("confidence", "")),
+                "temperature": clean_val(row.get("temperature", "")),
+                "humidity": clean_val(row.get("humidity", "")),
+                "rainfall_mm": clean_val(row.get("rainfall", "")),
+                "wind_speed": "",
+                "severity": "",
+                "inspection_id": clean_val(row.get("inspection_code", "")),
+                "area_hectare": clean_val(row.get("area_hectare", "")),
+            }
+        )
     return flat_rows
+
+
+def extract_excel() -> ExcelExtract:
+    """Read every Excel sheet and return structured extraction result.
+
+    Each sheet is returned as a separate DataFrame.  A backward-compatible
+    list of inspection-joined flat-row dicts is also included so that
+    existing callers (run_etl, transform_*) continue to work unchanged.
+    """
+    excel_path = r"D:\data\DGA_Enterprise_Dataset.xlsx"
+    logger.info("Extracting data from Excel: %s", excel_path)
+
+    # ── Read each sheet individually ───────────────────────────────────
+    companies_df = _read_sheet(excel_path, "companies")
+    farms_df = _read_sheet(excel_path, "farms")
+    zones_df = _read_sheet(excel_path, "zones")
+    trees_df = _read_sheet(excel_path, "trees")
+    inspections_df = _read_sheet(excel_path, "inspections")
+
+    logger.info(
+        "Read sheets — companies: %d, farms: %d, zones: %d, trees: %d, inspections: %d",
+        len(companies_df),
+        len(farms_df),
+        len(zones_df),
+        len(trees_df),
+        len(inspections_df),
+    )
+
+    # ── Build inspection-joined flat rows (backward compat) ────────────
+    # Use temporary copies with renamed columns so the originals stored
+    # in ExcelExtract keep their original column names.
+    farms_merge = farms_df.rename(columns={"tree_count": "farm_tree_count"})
+    zones_merge = zones_df.rename(columns={"tree_count": "zone_tree_count"})
+    trees_farms = pd.merge(trees_df, farms_merge, on="farm_code", how="left")
+    trees_farms = pd.merge(
+        trees_farms, zones_merge, on=["farm_code", "zone_name"], how="left"
+    )
+    trees_farms_comp = pd.merge(
+        trees_farms,
+        companies_df,
+        on="company_code",
+        how="left",
+        suffixes=("", "_comp"),
+    )
+    flat_rows = _build_flat_rows(inspections_df, trees_farms_comp)
+
+    logger.info("Extracted %d flat rows (inspection-joined, backward compat)", len(flat_rows))
+
+    return ExcelExtract(
+        companies_df=companies_df,
+        farms_df=farms_df,
+        zones_df=zones_df,
+        trees_df=trees_df,
+        inspections_df=inspections_df,
+        flat_rows=flat_rows,
+    )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -200,19 +281,6 @@ def parse_int(val: str) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
-
-def mode_value(values: List[str]) -> str:
-    """Return the most common value from a list."""
-    counter = Counter(values)
-    return counter.most_common(1)[0][0]
-
-
-def extract_province(district: str) -> Tuple[str, str]:
-    """Split 'Đắk Lắk - Buôn Hồ' into province='Đắk Lắk', district='Buôn Hồ'."""
-    if not district or "-" not in district:
-        return "", district or ""
-    parts = [p.strip() for p in district.split("-", 1)]
-    return parts[0], parts[1] if len(parts) > 1 else ""
 
 
 # ── ETL Statistics ───────────────────────────────────────────────────
@@ -255,79 +323,78 @@ class ETLStats:
 
 # ── TRANSFORM: Companies ─────────────────────────────────────────────
 
-def transform_companies(rows: List[Dict[str, str]]) -> List[Dict[str, Any]]:
-    """Extract unique companies from CSV rows."""
+def transform_companies(companies_df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """Extract unique companies from the Excel companies sheet."""
     seen = {}  # company_name -> doc
-    for r in rows:
-        name = r["company"].strip()
+    for _, row in companies_df.iterrows():
+        name = str(row.get("company_name", "")).strip()
         if not name or name in seen:
             continue
-        province, district = extract_province(r["district"])
         seen[name] = {
             "_id": ObjectId(),
-            "company_code": r["company_code"].strip(),
+            "company_code": str(row.get("company_code", "")).strip(),
             "company_name": name,
             "owner": None,
             "phone": None,
             "email": None,
-            "district": district,
-            "province": province,
+            "district": str(row.get("district", "")).strip(),
+            "province": str(row.get("province", "")).strip(),
             "created_at": datetime.now(timezone.utc),
         }
 
     companies = list(seen.values())
-    logger.info("Transformed %d unique companies", len(companies))
+    logger.info("Transformed %d unique companies from %d Excel rows",
+                len(companies), len(companies_df))
     return companies
 
 
 # ── TRANSFORM: Farms ─────────────────────────────────────────────────
 
 def transform_farms(
-    rows: List[Dict[str, str]],
+    farms_df: pd.DataFrame,
     company_map: Dict[str, ObjectId],
 ) -> List[Dict[str, Any]]:
-    """Extract unique farms with references to companies."""
+    """Extract unique farms from the Excel farms sheet."""
     seen = {}
 
-    for r in rows:
-        farm_id = r["farm_id"].strip()
+    for _, row in farms_df.iterrows():
+        farm_id = str(row.get("farm_code", "")).strip()
         if not farm_id or farm_id in seen:
             continue
 
-        province, district_val = extract_province(r["district"])
         seen[farm_id] = {
             "_id": ObjectId(),
             "farm_code": farm_id,
-            "farm_name": r["farm_name"].strip(),
-            "company_id": company_map.get(r["company"].strip()),
+            "farm_name": str(row.get("farm_name", "")).strip(),
+            "company_id": company_map.get(str(row.get("company_code", "")).strip()),
             "owner": None,
             "phone": None,
-            "district": district_val,
+            "district": str(row.get("district", "")).strip(),
             "commune": None,
             "latitude": None,
             "longitude": None,
-            "area_hectare": parse_float(r.get("area_hectare", "")),
-            "tree_count": parse_int(r.get("farm_tree_count", "")),
+            "area_hectare": parse_float(str(row.get("area_hectare", ""))),
+            "tree_count": parse_int(str(row.get("tree_count", ""))),
             "created_at": datetime.now(timezone.utc),
         }
 
     farms = list(seen.values())
-    logger.info("Transformed %d unique farms", len(farms))
+    logger.info("Transformed %d unique farms from %d Excel rows", len(farms), len(farms_df))
     return farms
 
 
 # ── TRANSFORM: Zones ─────────────────────────────────────────────────
 
 def transform_zones(
-    rows: List[Dict[str, str]],
+    zones_df: pd.DataFrame,
     farm_map: Dict[str, ObjectId],
 ) -> List[Dict[str, Any]]:
-    """Extract unique farm-zone combinations."""
+    """Extract unique farm-zone combinations from the Excel zones sheet."""
     seen = {}
 
-    for r in rows:
-        farm_id = r["farm_id"].strip()
-        zone_name = r["zone"].strip()
+    for _, row in zones_df.iterrows():
+        farm_id = str(row.get("farm_code", "")).strip()
+        zone_name = str(row.get("zone_name", "")).strip()
         if not farm_id or not zone_name:
             continue
         key = (farm_id, zone_name)
@@ -345,81 +412,61 @@ def transform_zones(
             "zone_name": zone_name,
             "soil_type": None,
             "irrigation": None,
-            "tree_count": parse_int(r.get("zone_tree_count", "")),
+            "tree_count": parse_int(str(row.get("tree_count", ""))),
             "created_at": datetime.now(timezone.utc),
         }
 
     zones = list(seen.values())
-    logger.info("Transformed %d unique zones", len(zones))
+    logger.info("Transformed %d unique zones from %d Excel rows", len(zones), len(zones_df))
     return zones
 
 
 # ── TRANSFORM: Trees ─────────────────────────────────────────────────
 
 def transform_trees(
-    rows: List[Dict[str, str]],
+    trees_df: pd.DataFrame,
+    inspections_df: pd.DataFrame,
     farm_map: Dict[str, ObjectId],
     zone_map: Dict[str, ObjectId],
     stats: ETLStats,
 ) -> List[Dict[str, Any]]:
-    """Aggregate and normalize tree data from CSV rows.
+    """Build trees from the Excel trees sheet directly.
 
-    Each (farm_id, tree_code) is a unique tree. For inconsistencies
-    (multiple zones, dates, varieties), the most common value is used.
+    Each row in trees_df is a unique tree. Inspection metadata
+    (last_inspection date) is pre-computed from inspections_df.
     """
-    # Collect all values per (farm_id, tree_code)
-    tree_data: Dict[Tuple[str, str], Dict[str, List[str]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
-    for r in rows:
-        key = (r["farm_id"].strip(), r["tree_code"].strip())
-        tree_data[key]["zone"].append(r["zone"].strip())
-        tree_data[key]["variety"].append(r["variety"].strip())
-        tree_data[key]["planting_date"].append(r["planting_date"].strip())
-        tree_data[key]["tree_status"].append(r.get("tree_status", "").strip())
-        tree_data[key]["tree_age"].append(r.get("tree_age", "").strip())
-        tree_data[key]["latitude"].append(r["latitude"].strip())
-        tree_data[key]["longitude"].append(r["longitude"].strip())
-        tree_data[key]["inspection_date"].append(r["inspection_date"].strip())
+    # Pre-compute last inspection date per tree_code from inspections
+    last_insp_by_tree: Dict[str, Optional[datetime]] = {}
+    for _, row in inspections_df.iterrows():
+        tree_code = str(row.get("tree_code", "")).strip()
+        if not tree_code:
+            continue
+        dt = parse_date(str(row.get("inspection_date", "")))
+        if dt and (tree_code not in last_insp_by_tree or dt > last_insp_by_tree[tree_code]):
+            last_insp_by_tree[tree_code] = dt
 
     trees = []
-    for (farm_id, tree_code), data in tree_data.items():
+    for _, row in trees_df.iterrows():
+        tree_code = str(row.get("tree_code", "")).strip()
+        farm_id = str(row.get("farm_code", "")).strip()
+        zone_name = str(row.get("zone_name", "")).strip()
+        if not tree_code or not farm_id:
+            stats.orphan_trees += 1
+            continue
+
         farm_oid = farm_map.get(farm_id)
         if not farm_oid:
             stats.orphan_trees += 1
             continue
 
-        # Zone: use most common zone for this tree
-        most_common_zone = mode_value(data["zone"])
-        tree_zone_code = f"{farm_id}_{most_common_zone.replace(' ', '_')}"
-        zone_oid = zone_map.get(tree_zone_code)
+        zone_code = f"{farm_id}_{zone_name.replace(' ', '_')}"
+        zone_oid = zone_map.get(zone_code)
 
-        # Planting date: most common
-        planting_str = mode_value(data["planting_date"])
-        planting_dt = parse_date(planting_str)
-
-        # Age: read directly from Excel
-        age_str = mode_value(data["tree_age"])
-        tree_age = parse_int(age_str)
-
-        # Lat/lng: most common
-        lat = parse_float(mode_value(data["latitude"]))
-        lng = parse_float(mode_value(data["longitude"]))
-
-        # Last inspection: max date
-        insp_dates = [
-            parse_date(d) for d in data["inspection_date"]
-            if parse_date(d)
-        ]
-        last_insp = max(insp_dates) if insp_dates else None
-
-        # Status: most common from Excel trees.status
-        status = mode_value(data["tree_status"])
-
-        # Variety: most common
-        variety = mode_value(data["variety"])
-
-        # QR code
+        variety = str(row.get("variety", "")).strip()
+        planting_dt = parse_date(str(row.get("planting_date", "")))
+        tree_age = parse_int(str(row.get("tree_age", "")))
+        status = str(row.get("status", "")).strip()
+        last_insp = last_insp_by_tree.get(tree_code)
         qr_code = f"QR-{farm_id}-{tree_code}"
 
         trees.append({
@@ -431,14 +478,15 @@ def transform_trees(
             "planting_date": planting_dt,
             "tree_age": tree_age,
             "status": status,
-            "latitude": lat,
-            "longitude": lng,
+            "latitude": None,
+            "longitude": None,
             "last_inspection": last_insp,
             "qr_code": qr_code,
             "created_at": datetime.now(timezone.utc),
         })
 
-    logger.info("Transformed %d unique trees (deduplicated from CSV)", len(trees))
+    logger.info("Transformed %d trees from %d Excel rows (uninspected included)",
+                len(trees), len(trees_df))
     return trees
 
 
@@ -699,47 +747,40 @@ def load_alerts(db: Database, alerts: List[Dict[str, Any]], stats: ETLStats) -> 
 # ── TRANSFORM: Inspections ───────────────────────────────────────────
 
 def transform_inspections(
-    rows: List[Dict[str, str]],
+    inspections_df: pd.DataFrame,
     tree_map: Dict[str, ObjectId],
     disease_map: Dict[str, ObjectId],
     stats: ETLStats,
 ) -> List[Dict[str, Any]]:
-    """Transform every CSV row into an inspection document."""
+    """Transform inspections from the Excel inspections sheet directly."""
     inspections = []
 
-    for r in rows:
-        tree_key = (r["farm_id"].strip(), r["tree_code"].strip())
-        tree_oid = tree_map.get(tree_key)
+    for _, row in inspections_df.iterrows():
+        tree_code = str(row.get("tree_code", "")).strip()
+        tree_oid = tree_map.get(tree_code)
         if not tree_oid:
             stats.orphan_inspections += 1
             continue
 
-        insp_date = parse_date(r["inspection_date"])
+        insp_date = parse_date(str(row.get("inspection_date", "")))
         if not insp_date:
             stats.invalid_dates += 1
             continue
 
-        raw_disease = r["disease"].strip()
+        raw_disease = str(row.get("predicted_disease", "")).strip()
         disease_code = DISEASE_NAME_TO_CODE.get(raw_disease, "healthy")
         disease_oid = disease_map.get(disease_code)
 
-        confidence = parse_float(r["confidence"]) or 0.0
-        temperature = parse_float(r["temperature"])
-        humidity = parse_float(r["humidity"])
-        rainfall = parse_float(r["rainfall_mm"])
-        wind = parse_float(r["wind_speed"])
+        confidence = parse_float(str(row.get("confidence", ""))) or 0.0
+        temperature = parse_float(str(row.get("temperature", "")))
+        humidity = parse_float(str(row.get("humidity", "")))
+        rainfall = parse_float(str(row.get("rainfall", "")))
 
-        health_status = r["status"].strip()
-        severity = r["severity"].strip()
-        if severity in ("None", ""):
-            severity = None
-
-        zone_code = f"{r['farm_id'].strip()}_{r['zone'].strip().replace(' ', '_')}"
-        farm_oid = ObjectId()  # Placeholder, filled from farm_map in load phase
+        health_status = str(row.get("health_status", "")).strip()
 
         inspections.append({
             "_id": ObjectId(),
-            "inspection_code": r["inspection_id"].strip(),
+            "inspection_code": str(row.get("inspection_code", "")).strip(),
             "farm_id": None,  # filled during load
             "zone_id": None,  # filled during load
             "tree_id": tree_oid,
@@ -748,16 +789,17 @@ def transform_inspections(
             "temperature": temperature,
             "humidity": humidity,
             "rainfall_mm": rainfall,
-            "wind_speed": wind,
+            "wind_speed": None,
             "confidence": confidence,
             "predicted_disease": raw_disease,
             "health_status": health_status,
-            "severity": severity,
+            "severity": None,
             "remark": None,
             "created_at": datetime.now(timezone.utc),
         })
 
-    logger.info("Transformed %d inspection records", len(inspections))
+    logger.info("Transformed %d inspection records from %d Excel rows",
+                len(inspections), len(inspections_df))
     return inspections
 
 
@@ -1105,19 +1147,19 @@ def run_etl(
 
     # Companies
     logger.info("  Normalizing companies...")
-    companies = transform_companies(rows)
+    companies = transform_companies(rows.companies_df)
     company_by_name = {c["company_name"]: c for c in companies}
 
     # Farms
     logger.info("  Normalizing farms...")
-    company_map = {c["company_name"]: c["_id"] for c in companies}
-    farms = transform_farms(rows, company_map)
+    company_map = {c["company_code"]: c["_id"] for c in companies}
+    farms = transform_farms(rows.farms_df, company_map)
     farm_by_code = {f["farm_code"]: f for f in farms}
 
     # Zones
     logger.info("  Normalizing zones...")
     farm_map = {f["farm_code"]: f["_id"] for f in farms}
-    zones = transform_zones(rows, farm_map)
+    zones = transform_zones(rows.zones_df, farm_map)
     zone_by_code = {z["zone_code"]: z for z in zones}
 
     # Users
@@ -1129,7 +1171,7 @@ def run_etl(
     zone_map = {}
     for z in zones:
         zone_map[z["zone_code"]] = z["_id"]
-    trees = transform_trees(rows, farm_map, zone_map, stats)
+    trees = transform_trees(rows.trees_df, rows.inspections_df, farm_map, zone_map, stats)
     tree_lookup_by_code = {t["tree_code"]: t["_id"] for t in trees}
 
     # Diseases
@@ -1139,20 +1181,10 @@ def run_etl(
 
     # Inspections
     logger.info("  Normalizing inspections...")
-    tree_lookup: Dict[Tuple[str, str], ObjectId] = {}
-    for t in trees:
-        farm_code = None
-        for fc, foid in farm_map.items():
-            if foid == t["farm_id"]:
-                farm_code = fc
-                break
-        if farm_code:
-            tree_lookup[(farm_code, t["tree_code"])] = t["_id"]
-
     disease_lookup = {d["code"]: d["_id"] for d in diseases}
 
     inspections = transform_inspections(
-        rows, tree_lookup, disease_lookup, stats
+        rows.inspections_df, tree_lookup_by_code, disease_lookup, stats
     )
 
     # Fix farm_id and zone_id for inspections

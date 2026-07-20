@@ -7,7 +7,8 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas import CompanyCreate, CompanyUpdate
+from app.schemas import CompanyCreate, CompanyOut, CompanyUpdate
+from app.schemas.response_models import MessageResponse, PaginatedResponse, SuccessResponse
 from app.services import CompanyService
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/companies", tags=["Companies"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedResponse[CompanyOut])
 async def list_companies(
     keyword: str | None = Query(None),
     page: int = Query(default=1, ge=1),
@@ -31,7 +32,7 @@ async def list_companies(
     )
 
 
-@router.get("/{company_id}")
+@router.get("/{company_id}", response_model=SuccessResponse[CompanyOut])
 async def get_company(
     company_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -43,7 +44,7 @@ async def get_company(
     return success_response(data=company)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[CompanyOut])
 async def create_company(
     data: CompanyCreate,
     user_id: str = Depends(get_current_user_id),
@@ -55,7 +56,7 @@ async def create_company(
     return success_response(data=company, message="Company created", status_code=201)
 
 
-@router.put("/{company_id}")
+@router.put("/{company_id}", response_model=SuccessResponse[CompanyOut])
 async def update_company(
     company_id: str,
     data: CompanyUpdate,
@@ -68,7 +69,7 @@ async def update_company(
     return success_response(data=company, message="Company updated")
 
 
-@router.delete("/{company_id}")
+@router.delete("/{company_id}", response_model=MessageResponse)
 async def delete_company(
     company_id: str,
     user_id: str = Depends(get_current_user_id),

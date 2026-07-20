@@ -7,7 +7,8 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas.inspection import InspectionCreate, InspectionUpdate
+from app.schemas.inspection import InspectionCreate, InspectionOut, InspectionUpdate
+from app.schemas.response_models import MessageResponse, PaginatedResponse, SuccessResponse
 from app.services.inspection_service import InspectionService
 
 router = APIRouter(prefix="/inspections", tags=["Inspections"])
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/inspections", tags=["Inspections"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedResponse[InspectionOut])
 async def list_inspections(
     keyword: str | None = Query(None),
     page: int = Query(default=1, ge=1),
@@ -31,7 +32,7 @@ async def list_inspections(
     )
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=SuccessResponse[InspectionOut])
 async def get_inspection(
     id: str,
     user_id: str = Depends(get_current_user_id),
@@ -43,7 +44,7 @@ async def get_inspection(
     return success_response(data=inspection)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[InspectionOut])
 async def create_inspection(
     data: InspectionCreate,
     user_id: str = Depends(get_current_user_id),
@@ -51,12 +52,11 @@ async def create_inspection(
     _=Depends(allow_all),
 ):
     service = InspectionService(db)
-    # The authenticated user_id acts as the inspector_id
     inspection = await service.create_inspection(data, user_id)
     return success_response(data=inspection, message="Inspection created", status_code=201)
 
 
-@router.put("/{id}")
+@router.put("/{id}", response_model=SuccessResponse[InspectionOut])
 async def update_inspection(
     id: str,
     data: InspectionUpdate,
@@ -65,12 +65,11 @@ async def update_inspection(
     _=Depends(allow_all),
 ):
     service = InspectionService(db)
-    # The authenticated user_id acts as the inspector_id
     inspection = await service.update_inspection(id, data, user_id)
     return success_response(data=inspection, message="Inspection updated")
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=MessageResponse)
 async def delete_inspection(
     id: str,
     user_id: str = Depends(get_current_user_id),

@@ -14,6 +14,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.models.enums import UserRole, api_role_to_db
 from app.repositories import UserRepository
 from app.schemas import TokenOut, UserOut, UserProfileUpdate, UserRegister
 
@@ -26,26 +27,25 @@ class AuthService:
         existing = await self.repo.get_by_email(data.email)
         if existing:
             raise ConflictException("Email already registered")
-            
-        # Generate user_code
-        count = await self.repo.collection.count_documents({})
+
+        count = await self.repo.count_all()
         num = count + 1
         while True:
             user_code = f"USR{num:04d}"
-            existing_user = await self.repo.collection.find_one({"user_code": user_code})
-            if not existing_user:
+            if not await self.repo.exists_by_user_code(user_code):
                 break
             num += 1
 
         password_hash = hash_password(data.password)
+        db_role = api_role_to_db(data.role.value)
+
         user_id = await self.repo.create(
             {
                 "user_code": user_code,
                 "full_name": data.full_name,
-                "fullname": data.full_name,
                 "email": data.email,
                 "password_hash": password_hash,
-                "role": data.role.value,
+                "role": db_role,
             }
         )
         user = await self.repo.get(user_id)
@@ -53,7 +53,7 @@ class AuthService:
             raise BadRequestException("Registration failed")
         return UserOut(
             id=user["id"],
-            full_name=user.get("full_name") or user.get("fullname", ""),
+            full_name=user.get("full_name", ""),
             email=user["email"],
             role=user["role"],
             created_at=user["created_at"],
@@ -112,7 +112,7 @@ class AuthService:
             raise UnauthorizedException("User not found")
         return UserOut(
             id=user["id"],
-            full_name=user.get("full_name") or user.get("fullname", ""),
+            full_name=user.get("full_name", ""),
             email=user["email"],
             role=user["role"],
             created_at=user["created_at"],
@@ -124,10 +124,9 @@ class AuthService:
         update_data = {}
         if data.full_name is not None:
             update_data["full_name"] = data.full_name
-            update_data["fullname"] = data.full_name
         if data.email is not None:
             update_data["email"] = data.email
-            
+
         if "email" in update_data:
             existing = await self.repo.get_by_email(update_data["email"])
             if existing and existing["id"] != user_id:
@@ -137,7 +136,7 @@ class AuthService:
             raise BadRequestException("Update failed")
         return UserOut(
             id=updated["id"],
-            full_name=updated.get("full_name") or updated.get("fullname", ""),
+            full_name=updated.get("full_name", ""),
             email=updated["email"],
             role=updated["role"],
             created_at=updated["created_at"],

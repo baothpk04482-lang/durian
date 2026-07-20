@@ -1,18 +1,18 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 
 import { loadDashboardData } from "../../services/dashboardDataManager.service";
+import type { BackendKpi, SystemOverviewData } from "../../services/dashboardDataManager.service";
 
 import type { Tree } from "../../types/tree";
 import type { Inspection } from "../../types/inspection";
 import type { DetectionResult } from "../../types/detectionResult";
-import type { Disease } from "../../types/disease";
 import type { Alert } from "../../types/alert";
 import type { Zone } from "../../types/zone";
 import type { Farm } from "../../types/farm";
 
 import DashboardHeader from "../../components/dashboard/DashboardHeader";
 import KPISection from "../../components/dashboard/KPISection";
-import WeatherForecastCard from "../../components/dashboard/WeatherForecastCard";
+import SystemOverviewCard from "../../components/dashboard/SystemOverviewCard";
 import HeatmapCard from "../../components/dashboard/HeatmapCard";
 import AgronomistPanel from "../../components/dashboard/AgronomistPanel";
 import TreeDistributionCard from "../../components/dashboard/TreeDistributionCard";
@@ -22,21 +22,18 @@ import type { CellData, ZoneSection } from "../../components/dashboard/HeatmapGr
 import type { InspectionRow } from "../../components/dashboard/InspectionTable";
 import { formatDateTime } from "../../utils/dateFormatter";
 
+
 export default function DashboardPage() {
   const [trees, setTrees] = useState<Tree[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [detections, setDetections] = useState<DetectionResult[]>([]);
-  const [, setDiseases] = useState<Disease[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [kpiHealthyCount, setKpiHealthyCount] = useState(0);
-  const [kpiMonitoringCount, setKpiMonitoringCount] = useState(0);
-  const [kpiDiseasedCount, setKpiDiseasedCount] = useState(0);
-  const [kpiEmergencyCount, setKpiEmergencyCount] = useState(0);
-  const [kpiTotalTrees, setKpiTotalTrees] = useState(0);
+  const [backendKpi, setBackendKpi] = useState<BackendKpi>({ total_farms: 0, total_trees: 0, healthy_trees: 0, diseased_trees: 0, high_risk_trees: 0 });
+  const [systemOverview, setSystemOverview] = useState<SystemOverviewData>({ inspection_today: 0, ai_detection_today: 0, new_alerts_today: 0, pending_review: 0, updated_at: "" });
   const [farmFilter, setFarmFilter] = useState("all");
   const [zoneFilter, setZoneFilter] = useState("all");
 
@@ -44,19 +41,15 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     loadDashboardData()
-      .then(({ farms, zones, trees, inspections, detections, diseases, alerts, kpiTotalTrees: totalTrees, kpiHealthyCount, kpiMonitoringCount, kpiDiseasedCount, kpiEmergencyCount }) => {
+      .then(({ farms, zones, trees, inspections, detections, alerts, backendKpi, systemOverview }) => {
         setTrees(trees);
         setFarms(farms);
         setZones(zones);
         setInspections(inspections);
         setDetections(detections);
-        setDiseases(diseases);
         setAlerts(alerts);
-        setKpiTotalTrees(totalTrees);
-        setKpiHealthyCount(kpiHealthyCount);
-        setKpiMonitoringCount(kpiMonitoringCount);
-        setKpiDiseasedCount(kpiDiseasedCount);
-        setKpiEmergencyCount(kpiEmergencyCount);
+        setBackendKpi(backendKpi);
+        setSystemOverview(systemOverview);
       })
       .finally(() => { setLoading(false); });
   };
@@ -69,9 +62,12 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, []);
 
-  // --- KPI computations ---
-  void kpiTotalTrees; void kpiHealthyCount; void kpiMonitoringCount; void kpiDiseasedCount; void kpiEmergencyCount;
-
+  // --- KPI from backend ---
+  const kpiTotalTrees = backendKpi.total_trees;
+  const kpiHealthyCount = backendKpi.healthy_trees;
+  const kpiDiseasedCount = backendKpi.diseased_trees;
+  const kpiMonitoringCount = backendKpi.total_trees - backendKpi.healthy_trees - backendKpi.diseased_trees;
+  const kpiEmergencyCount = backendKpi.high_risk_trees;
   const newTreesThisMonth = 0;
 
   // --- Zone / Farm lookup maps ---
@@ -122,12 +118,7 @@ export default function DashboardPage() {
     });
   }, [trees, farmFilter, zoneFilter, zoneMap]);
 
-  // --- Filtered KPIs (derived from filteredTrees) ---
-  const filteredKpiTotalTrees = filteredTrees.length;
-  const filteredKpiHealthyCount = filteredTrees.filter((t) => t.status === "Healthy").length;
-  const filteredKpiMonitoringCount = filteredTrees.filter((t) => t.status === "Monitoring").length;
-  const filteredKpiDiseasedCount = filteredTrees.filter((t) => t.status !== "Healthy" && t.status !== "Monitoring").length;
-  const filteredHealthyPercent = filteredKpiTotalTrees > 0 ? Math.round((filteredKpiHealthyCount / filteredKpiTotalTrees) * 100) : 0;
+  const filteredHealthyPercent = kpiTotalTrees > 0 ? Math.round((kpiHealthyCount / kpiTotalTrees) * 100) : 0;
 
   // Unique farms/zones from filtered trees
   const filteredFarmIds = useMemo(() => {
@@ -145,7 +136,6 @@ export default function DashboardPage() {
     return ids;
   }, [filteredTrees]);
 
-  const filteredFarmCount = filteredFarmIds.size;
   const filteredZoneCount = filteredZoneIds.size;
   const filteredFarmArea = useMemo(() => {
     let area = 0;
@@ -156,9 +146,6 @@ export default function DashboardPage() {
     return area;
   }, [filteredFarmIds, farmMap]);
   const filteredFarmAreaFormatted = `${filteredFarmArea.toFixed(1)} ha`;
-
-  // Tree IDs in the filtered set (for quick lookup)
-  const filteredTreeIds = useMemo(() => new Set(filteredTrees.map((t) => t._id)), [filteredTrees]);
 
   const detectionMap = useMemo(() => {
     const m = new Map<string, DetectionResult>();
@@ -245,11 +232,11 @@ export default function DashboardPage() {
   // Farm Health Distribution
   const filteredFarmHealthData = useMemo(() => {
     return [
-      { name: "Khỏe mạnh", value: filteredKpiHealthyCount, color: "#22C55E" },
-      { name: "Theo dõi", value: filteredKpiMonitoringCount, color: "#EAB308" },
-      { name: "Bị bệnh", value: filteredKpiDiseasedCount, color: "#EF4444" },
+      { name: "Khỏe mạnh", value: kpiHealthyCount, color: "#22C55E" },
+      { name: "Theo dõi", value: kpiMonitoringCount, color: "#EAB308" },
+      { name: "Bị bệnh", value: kpiDiseasedCount, color: "#EF4444" },
     ];
-  }, [filteredKpiHealthyCount, filteredKpiMonitoringCount, filteredKpiDiseasedCount]);
+  }, [kpiHealthyCount, kpiMonitoringCount, kpiDiseasedCount]);
 
   // Inspection table data — O(n) join using pre-built lookup maps
   const inspectionTableData: InspectionRow[] = useMemo(() => {
@@ -441,18 +428,6 @@ export default function DashboardPage() {
     return { high, medium, low };
   }, [alerts, farmFilter, zoneFilter, treeMap, zoneMap, alertCounts]);
 
-  const filteredEmergencyCount = useMemo(() => {
-    const highAlertTreeIdsFiltered = [
-      ...new Set(
-        alerts
-          .filter((a) => a.tree_id && (a.priority || "").toLowerCase() === "high")
-          .map((a) => a.tree_id as string)
-          .filter((tid) => filteredTreeIds.has(tid))
-      ),
-    ];
-    return highAlertTreeIdsFiltered.length;
-  }, [alerts, filteredTreeIds]);
-
   // Reset zone filter when farm changes
   useEffect(() => {
     setZoneFilter("all");
@@ -483,16 +458,16 @@ export default function DashboardPage() {
         <div className="flex flex-col lg:grid lg:grid-cols-3 gap-5" style={{ gridTemplateRows: "auto 520px 420px" }}>
           <div className="lg:col-span-3">
             <KPISection
-              totalTrees={filteredKpiTotalTrees}
+              totalTrees={kpiTotalTrees}
               newTreesThisMonth={newTreesThisMonth}
               healthyPercent={filteredHealthyPercent}
               farmArea={filteredFarmAreaFormatted}
-              farmCount={filteredFarmCount}
+              farmCount={backendKpi.total_farms}
               zoneCount={filteredZoneCount}
-              emergencyCount={filteredEmergencyCount}
+              emergencyCount={kpiEmergencyCount}
             />
           </div>
-          <WeatherForecastCard />
+          <SystemOverviewCard data={systemOverview} />
           <HeatmapCard
             sections={zoneSections}
             lastUpdated={heatmapLastUpdated}
@@ -509,14 +484,14 @@ export default function DashboardPage() {
             <AgronomistPanel
               priorityTrees={filteredPriorityTrees}
               farmStatus={farmStatus}
-              kpiHealthyCount={filteredKpiHealthyCount}
-              kpiMonitoringCount={filteredKpiMonitoringCount}
-              kpiDiseasedCount={filteredKpiDiseasedCount}
+              kpiHealthyCount={kpiHealthyCount}
+              kpiMonitoringCount={kpiMonitoringCount}
+              kpiDiseasedCount={kpiDiseasedCount}
               alertCounts={filteredAlertCounts}
               highRiskCount={filteredHighRiskCount}
             />
           </div>
-          <TreeDistributionCard data={filteredFarmHealthData} total={filteredKpiTotalTrees} />
+          <TreeDistributionCard data={filteredFarmHealthData} total={kpiTotalTrees} />
           <RealtimeInspectionCard data={filteredInspectionRows} onRefresh={fetchDashboardData} />
         </div>
       )}

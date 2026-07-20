@@ -9,6 +9,21 @@ class ZoneRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         super().__init__(db, "zones")
 
+    async def exists_by_id(self, zone_id: str) -> bool:
+        from bson import ObjectId
+        if not ObjectId.is_valid(zone_id):
+            return False
+        return await self.collection.find_one({"_id": ObjectId(zone_id)}) is not None
+
+    async def get_farm_id(self, zone_id: str) -> str | None:
+        from bson import ObjectId
+        if not ObjectId.is_valid(zone_id):
+            return None
+        doc = await self.collection.find_one({"_id": ObjectId(zone_id)}, {"farm_id": 1})
+        if doc and "farm_id" in doc:
+            return str(doc["farm_id"])
+        return None
+
     async def list_by_farm(
         self, farm_id: str, page: int = 1, per_page: int = 20, keyword: str | None = None
     ) -> tuple[list[dict], int]:

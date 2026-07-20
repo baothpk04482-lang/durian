@@ -6,6 +6,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.exceptions import NotFoundException, BadRequestException
 from app.repositories.alert_repository import AlertRepository
+from app.repositories.farm_repository import FarmRepository
+from app.repositories.tree_repository import TreeRepository
 from app.schemas.alert import AlertCreate, AlertUpdate
 
 logger = logging.getLogger(__name__)
@@ -26,19 +28,15 @@ class AlertService:
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self.db = db
         self.repo = AlertRepository(db)
+        self.farm_repo = FarmRepository(db)
+        self.tree_repo = TreeRepository(db)
 
     async def _validate_farm(self, farm_id: str) -> None:
-        if not ObjectId.is_valid(farm_id):
-            raise BadRequestException("Invalid farm_id format")
-        farm = await self.db["farms"].find_one({"_id": ObjectId(farm_id)})
-        if not farm:
+        if not await self.farm_repo.exists_by_id(farm_id):
             raise BadRequestException(f"Farm with ID '{farm_id}' does not exist")
 
     async def _validate_tree(self, tree_id: str) -> None:
-        if not ObjectId.is_valid(tree_id):
-            raise BadRequestException("Invalid tree_id format")
-        tree = await self.db["trees"].find_one({"_id": ObjectId(tree_id)})
-        if not tree:
+        if not await self.tree_repo.exists_by_id(tree_id):
             raise BadRequestException(f"Tree with ID '{tree_id}' does not exist")
 
     async def list_alerts(

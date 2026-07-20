@@ -9,7 +9,7 @@ async def test_register_success(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/register",
         json={
-            "fullname": "New Farmer",
+            "full_name": "New Farmer",
             "email": "new@test.com",
             "password": "testpass123",
         },
@@ -18,7 +18,7 @@ async def test_register_success(client: AsyncClient):
     data = response.json()
     assert data["success"] is True
     assert data["message"] == "Registration successful"
-    assert data["data"]["fullname"] == "New Farmer"
+    assert data["data"]["full_name"] == "New Farmer"
     assert data["data"]["email"] == "new@test.com"
 
 
@@ -27,7 +27,7 @@ async def test_register_duplicate(client: AsyncClient):
     await client.post(
         "/api/v1/auth/register",
         json={
-            "fullname": "Farmer One",
+            "full_name": "Farmer One",
             "email": "dup@test.com",
             "password": "testpass123",
         },
@@ -35,7 +35,7 @@ async def test_register_duplicate(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/register",
         json={
-            "fullname": "Farmer Two",
+            "full_name": "Farmer Two",
             "email": "dup@test.com",
             "password": "testpass123",
         },
@@ -50,7 +50,7 @@ async def test_login_success(client: AsyncClient):
     await client.post(
         "/api/v1/auth/register",
         json={
-            "fullname": "Login User",
+            "full_name": "Login User",
             "email": "login@test.com",
             "password": "testpass123",
         },
@@ -74,7 +74,7 @@ async def test_change_password_success(client: AsyncClient):
     await client.post(
         "/api/v1/auth/register",
         json={
-            "fullname": "Change Pwd",
+            "full_name": "Change Pwd",
             "email": "changepwd@test.com",
             "password": "oldpass123",
         },
@@ -106,7 +106,7 @@ async def test_change_password_wrong_old(client: AsyncClient):
     await client.post(
         "/api/v1/auth/register",
         json={
-            "fullname": "Wrong Old",
+            "full_name": "Wrong Old",
             "email": "wrongold@test.com",
             "password": "correctpass",
         },

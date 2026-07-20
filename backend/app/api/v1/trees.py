@@ -9,7 +9,12 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas import TreeCreate, TreeUpdate
+from app.schemas import TreeCreate, TreeOut, TreeUpdate
+from app.schemas.response_models import (
+    MessageResponse,
+    PaginatedWithTotalPagesResponse,
+    SuccessResponse,
+)
 from app.services import TreeService
 
 logger = logging.getLogger(__name__)
@@ -19,7 +24,7 @@ router = APIRouter(prefix="/trees", tags=["Trees"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedWithTotalPagesResponse[TreeOut])
 async def list_trees(
     zone_id: str | None = Query(None),
     farm_id: str | None = Query(None),
@@ -53,7 +58,7 @@ async def list_trees(
     )
 
 
-@router.get("/{tree_id}")
+@router.get("/{tree_id}", response_model=SuccessResponse[TreeOut])
 async def get_tree(
     tree_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -65,7 +70,7 @@ async def get_tree(
     return success_response(data=tree)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[TreeOut])
 async def create_tree(
     data: TreeCreate,
     user_id: str = Depends(get_current_user_id),
@@ -77,7 +82,7 @@ async def create_tree(
     return success_response(data=tree, message="Tree created", status_code=201)
 
 
-@router.put("/{tree_id}")
+@router.put("/{tree_id}", response_model=SuccessResponse[TreeOut])
 async def update_tree(
     tree_id: str,
     data: TreeUpdate,
@@ -90,7 +95,7 @@ async def update_tree(
     return success_response(data=tree, message="Tree updated")
 
 
-@router.get("/{tree_id}/digital-id")
+@router.get("/{tree_id}/digital-id", response_model=SuccessResponse[dict])
 async def get_tree_digital_id(
     tree_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -103,7 +108,7 @@ async def get_tree_digital_id(
     return success_response(data=result)
 
 
-@router.delete("/{tree_id}")
+@router.delete("/{tree_id}", response_model=MessageResponse)
 async def delete_tree(
     tree_id: str,
     user_id: str = Depends(get_current_user_id),

@@ -11,6 +11,8 @@ from app.core.exceptions import BadRequestException
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
+from app.schemas.disease import DetectionResponse
+from app.schemas.response_models import SuccessResponse
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/ai", tags=["AI Detection"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.post("/detect")
+@router.post("/detect", response_model=SuccessResponse[DetectionResponse])
 async def detect_disease(
     tree_id: str = Form(...),
     file: UploadFile = File(...),
@@ -39,7 +41,7 @@ async def detect_disease(
     )
 
 
-@router.post("/image-quality")
+@router.post("/image-quality", response_model=SuccessResponse[dict])
 async def check_image_quality(
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user_id),

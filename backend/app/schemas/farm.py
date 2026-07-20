@@ -34,5 +34,5 @@ class FarmOut(BaseModel):
     gps_lat: float | None
     gps_lng: float | None
     area: float | None
-    owner_id: str
+    company_id: str
     created_at: datetime

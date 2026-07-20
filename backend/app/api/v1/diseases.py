@@ -7,7 +7,8 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas.disease import DiseaseCreate, DiseaseUpdate
+from app.schemas.disease import DiseaseCreate, DiseaseOut, DiseaseUpdate
+from app.schemas.response_models import MessageResponse, PaginatedResponse, SuccessResponse
 from app.services.disease_service import DiseaseService
 
 router = APIRouter(prefix="/diseases", tags=["Diseases"])
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/diseases", tags=["Diseases"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedResponse[DiseaseOut])
 async def list_diseases(
     keyword: str | None = Query(None),
     page: int = Query(default=1, ge=1),
@@ -31,7 +32,7 @@ async def list_diseases(
     )
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=SuccessResponse[DiseaseOut])
 async def get_disease(
     id: str,
     user_id: str = Depends(get_current_user_id),
@@ -43,7 +44,7 @@ async def get_disease(
     return success_response(data=result)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[DiseaseOut])
 async def create_disease(
     data: DiseaseCreate,
     user_id: str = Depends(get_current_user_id),
@@ -55,7 +56,7 @@ async def create_disease(
     return success_response(data=result, message="Disease created", status_code=201)
 
 
-@router.put("/{id}")
+@router.put("/{id}", response_model=SuccessResponse[DiseaseOut])
 async def update_disease(
     id: str,
     data: DiseaseUpdate,
@@ -68,7 +69,7 @@ async def update_disease(
     return success_response(data=result, message="Disease updated")
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=MessageResponse)
 async def delete_disease(
     id: str,
     user_id: str = Depends(get_current_user_id),

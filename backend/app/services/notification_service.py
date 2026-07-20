@@ -6,6 +6,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.exceptions import NotFoundException
 from app.repositories import NotificationRepository
+from app.repositories.zone_repository import ZoneRepository
+from app.repositories.tree_repository import TreeRepository
 from app.schemas import NotificationCreate
 
 logger = logging.getLogger(__name__)
@@ -15,6 +17,8 @@ class NotificationService:
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self.db = db
         self.repo = NotificationRepository(db)
+        self.zone_repo = ZoneRepository(db)
+        self.tree_repo = TreeRepository(db)
 
     async def list_unread(
         self, page: int = 1, per_page: int = 20
@@ -56,16 +60,23 @@ class NotificationService:
         from datetime import datetime, timezone
 
         farm_oid = ObjectId(data.farm_id) if ObjectId.is_valid(data.farm_id) else ObjectId()
-        zone_doc = await self.db["zones"].find_one({"farm_id": farm_oid})
-        tree_oid = ObjectId()
-        if zone_doc:
-            tree_doc = await self.db["trees"].find_one({"zone_id": zone_doc["_id"]})
+
+        # Find first zone and tree for this farm via repositories
+        zone_id = await self.zone_repo.list_by_farm(str(farm_oid), page=1, per_page=1)
+        zone_items = zone_id[0] if isinstance(zone_id, tuple) else []
+        zone_oid = zone_items[0]["id"] if zone_items else None
+
+        tree_oid = None
+        if zone_oid:
+            tree_doc = await self.tree_repo.get_first_by_zone(zone_oid)
             if tree_doc:
-                tree_oid = tree_doc["_id"]
+                tree_oid = tree_doc.get("id")
+
+        tree_object_id = ObjectId(tree_oid) if tree_oid else ObjectId()
 
         alert_doc = {
             "farm_id": farm_oid,
-            "tree_id": tree_oid,
+            "tree_id": tree_object_id,
             "alert_type": data.title[:50] if data.title else "Notification",
             "priority": "Medium",
             "date": datetime.now(timezone.utc),

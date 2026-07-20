@@ -7,7 +7,8 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas.user_crud import UserCreate, UserUpdate
+from app.schemas.response_models import MessageResponse, PaginatedResponse, SuccessResponse
+from app.schemas.user_crud import UserCreate, UserOut, UserUpdate
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedResponse[UserOut])
 async def list_users(
     keyword: str | None = Query(None),
     page: int = Query(default=1, ge=1),
@@ -31,7 +32,7 @@ async def list_users(
     )
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=SuccessResponse[UserOut])
 async def get_user(
     id: str,
     user_id: str = Depends(get_current_user_id),
@@ -43,7 +44,7 @@ async def get_user(
     return success_response(data=user)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[UserOut])
 async def create_user(
     data: UserCreate,
     user_id: str = Depends(get_current_user_id),
@@ -55,7 +56,7 @@ async def create_user(
     return success_response(data=user, message="User created", status_code=201)
 
 
-@router.put("/{id}")
+@router.put("/{id}", response_model=SuccessResponse[UserOut])
 async def update_user(
     id: str,
     data: UserUpdate,
@@ -68,7 +69,7 @@ async def update_user(
     return success_response(data=user, message="User updated")
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=MessageResponse)
 async def delete_user(
     id: str,
     user_id: str = Depends(get_current_user_id),

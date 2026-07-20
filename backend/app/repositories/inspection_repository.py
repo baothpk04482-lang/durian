@@ -10,6 +10,12 @@ class InspectionRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         super().__init__(db, "inspections")
 
+    async def exists_by_id(self, inspection_id: str) -> bool:
+        from bson import ObjectId
+        if not ObjectId.is_valid(inspection_id):
+            return False
+        return await self.collection.find_one({"_id": ObjectId(inspection_id)}) is not None
+
     def _build_enrichment_stages(self) -> list[dict]:
         return [
             {

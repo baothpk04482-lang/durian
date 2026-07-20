@@ -10,6 +10,7 @@ Orchestrates:
   2. Collection creation with JSON Schema validation
   3. Index creation
   4. Relationship integrity verification
+  5. Admin account seeding
 
 Usage:
     python -m database.setup_database
@@ -23,6 +24,9 @@ import sys
 from typing import List, Optional
 
 from database.etl_pipeline import run_etl, print_summary
+from database.seed_admin import seed_admin
+from pymongo import MongoClient
+from database.config import settings
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -63,6 +67,21 @@ def main() -> None:
         verbose=args.verbose,
     )
     print_summary(stats)
+
+    # Seed admin account after ETL completes (unless dry-run)
+    if not args.dry_run and not stats.errors:
+        try:
+            client = MongoClient(
+                settings.mongodb_uri_with_credentials,
+                **settings.connection_kwargs,
+            )
+            client.admin.command("ping")
+            db = client[settings.DATABASE_NAME]
+            seed_admin(db)
+            client.close()
+        except Exception as exc:
+            print(f"Warning: Admin seed failed: {exc}", file=sys.stderr)
+
     if stats.errors:
         sys.exit(1)
 

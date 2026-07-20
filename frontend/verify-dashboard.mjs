@@ -63,7 +63,7 @@ console.log(`\nBody contains "Risk Forecast": ${hasRiskForecastText}`);
 // Check all section titles
 const sections = [
   "Dashboard", "Farm Health", "Active Alerts", "Weather Risk", "Yield Prediction",
-  "Weather Intelligence", "Disease Heatmap", "Latest Detection", "AI Agronomist",
+  "Disease Heatmap", "Latest Detection", "AI Agronomist",
   "Disease Trend", "Risk Forecast", "Disease Distribution", "Today's Alerts",
   "AI Preview", "AI Vision", "AI Forecast",
 ];

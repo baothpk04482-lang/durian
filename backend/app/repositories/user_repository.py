@@ -44,6 +44,12 @@ class UserRepository(BaseRepository):
     async def get_by_id(self, id: str) -> dict | None:
         return await self.get(id)
 
+    async def count_all(self) -> int:
+        return await self.collection.count_documents({})
+
+    async def exists_by_user_code(self, user_code: str) -> bool:
+        return await self.collection.find_one({"user_code": user_code}) is not None
+
     def _to_oid(self, id: str):
         from bson import ObjectId
         return ObjectId(id)

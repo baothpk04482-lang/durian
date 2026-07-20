@@ -5,27 +5,11 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.exceptions import NotFoundException, ConflictException, BadRequestException
 from app.core.security import hash_password
-from app.models.enums import UserRole
+from app.models.enums import UserRole, api_role_to_db, db_role_to_api
 from app.repositories.user_repository import UserRepository
 from app.schemas.user_crud import UserCreate, UserUpdate
 
 logger = logging.getLogger(__name__)
-
-# Bidirectional role mappings to support both API enums and DB JSON Schema validation rules
-API_TO_DB_ROLE = {
-    UserRole.enterprise_admin.value: "Admin",
-    UserRole.farm_manager.value: "Farm Manager",
-    UserRole.field_technician.value: "Inspector",
-    UserRole.farmer.value: "Technician",
-}
-
-DB_TO_API_ROLE = {
-    "Admin": UserRole.enterprise_admin.value,
-    "Company Manager": UserRole.farm_manager.value,
-    "Farm Manager": UserRole.farm_manager.value,
-    "Inspector": UserRole.field_technician.value,
-    "Technician": UserRole.farmer.value,
-}
 
 
 def serialize_user(doc: dict | None) -> dict | None:
@@ -33,8 +17,7 @@ def serialize_user(doc: dict | None) -> dict | None:
         return None
     res = doc.copy()
     db_role = res.get("role")
-    res["role"] = DB_TO_API_ROLE.get(db_role, UserRole.field_technician.value)
-    # never expose password hash
+    res["role"] = db_role_to_api(db_role)
     res.pop("password_hash", None)
     return res
 
@@ -65,18 +48,16 @@ class UserService:
         if existing:
             raise ConflictException("Email already in use")
 
-        # Generate unique user_code
-        count = await self.repo.collection.count_documents({})
+        count = await self.repo.count_all()
         num = count + 1
         while True:
             user_code = f"USR{num:04d}"
-            existing_user = await self.repo.collection.find_one({"user_code": user_code})
-            if not existing_user:
+            if not await self.repo.exists_by_user_code(user_code):
                 break
             num += 1
 
         password_hash = hash_password(data.password)
-        db_role = API_TO_DB_ROLE.get(data.role.value, "Inspector")
+        db_role = api_role_to_db(data.role.value)
 
         user_doc = {
             "user_code": user_code,
@@ -114,7 +95,7 @@ class UserService:
             update_data["password_hash"] = hash_password(data.password)
 
         if data.role is not None:
-            update_data["role"] = API_TO_DB_ROLE.get(data.role.value, "Inspector")
+            update_data["role"] = api_role_to_db(data.role.value)
 
         if update_data:
             updated = await self.repo.update(user_id, update_data)

@@ -6,13 +6,15 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.dependencies import get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
-from app.schemas import ChatRequest
+from app.schemas import ChatResponse
+from app.schemas.chat import ChatRequest
+from app.schemas.response_models import SuccessResponse
 from app.services import ChatService
 
 router = APIRouter(prefix="/chat", tags=["AI Agronomist"])
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[ChatResponse])
 async def chat(
     data: ChatRequest,
     user_id: str = Depends(get_current_user_id),

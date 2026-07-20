@@ -4,22 +4,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
-
-import enum
-
-class UserRoleDb(str, enum.Enum):
-    Admin = "Admin"
-    Company_Manager = "Company Manager"
-    Farm_Manager = "Farm Manager"
-    Inspector = "Inspector"
-    Technician = "Technician"
+from app.models.enums import UserRole
 
 
 class UserRegister(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=128)
-    role: UserRoleDb = UserRoleDb.Inspector
+    role: UserRole = UserRole.field_technician
 
 
 class UserLogin(BaseModel):

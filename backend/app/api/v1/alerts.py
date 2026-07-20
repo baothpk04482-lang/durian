@@ -7,7 +7,8 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas.alert import AlertCreate, AlertUpdate
+from app.schemas.alert import AlertCreate, AlertOut, AlertUpdate
+from app.schemas.response_models import MessageResponse, PaginatedResponse, SuccessResponse
 from app.services.alert_service import AlertService
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/alerts", tags=["Alerts"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedResponse[AlertOut])
 async def list_alerts(
     keyword: str | None = Query(None),
     page: int = Query(default=1, ge=1),
@@ -31,7 +32,7 @@ async def list_alerts(
     )
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=SuccessResponse[AlertOut])
 async def get_alert(
     id: str,
     user_id: str = Depends(get_current_user_id),
@@ -43,7 +44,7 @@ async def get_alert(
     return success_response(data=result)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[AlertOut])
 async def create_alert(
     data: AlertCreate,
     user_id: str = Depends(get_current_user_id),
@@ -55,7 +56,7 @@ async def create_alert(
     return success_response(data=result, message="Alert created", status_code=201)
 
 
-@router.put("/{id}")
+@router.put("/{id}", response_model=SuccessResponse[AlertOut])
 async def update_alert(
     id: str,
     data: AlertUpdate,
@@ -68,7 +69,7 @@ async def update_alert(
     return success_response(data=result, message="Alert updated")
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=MessageResponse)
 async def delete_alert(
     id: str,
     user_id: str = Depends(get_current_user_id),

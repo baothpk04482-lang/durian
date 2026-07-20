@@ -6,6 +6,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.exceptions import NotFoundException, BadRequestException
 from app.repositories.inspection_repository import InspectionRepository
+from app.repositories.tree_repository import TreeRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.inspection import InspectionCreate, InspectionUpdate
 
 logger = logging.getLogger(__name__)
@@ -25,19 +27,15 @@ class InspectionService:
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self.db = db
         self.repo = InspectionRepository(db)
+        self.tree_repo = TreeRepository(db)
+        self.user_repo = UserRepository(db)
 
     async def _validate_inspector(self, inspector_id: str) -> None:
-        if not ObjectId.is_valid(inspector_id):
-            raise BadRequestException("Invalid inspector_id format")
-        user = await self.db["users"].find_one({"_id": ObjectId(inspector_id)})
-        if not user:
+        if not await self.user_repo.get_by_id(inspector_id):
             raise BadRequestException(f"Inspector with ID '{inspector_id}' does not exist")
 
     async def _validate_tree(self, tree_id: str) -> None:
-        if not ObjectId.is_valid(tree_id):
-            raise BadRequestException("Invalid tree_id format")
-        tree = await self.db["trees"].find_one({"_id": ObjectId(tree_id)})
-        if not tree:
+        if not await self.tree_repo.exists_by_id(tree_id):
             raise BadRequestException(f"Tree with ID '{tree_id}' does not exist")
 
     async def list_inspections(

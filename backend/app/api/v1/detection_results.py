@@ -7,7 +7,8 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas.detection_result import DetectionResultCreate, DetectionResultUpdate
+from app.schemas.detection_result import DetectionResultCreate, DetectionResultOut, DetectionResultUpdate
+from app.schemas.response_models import MessageResponse, PaginatedResponse, SuccessResponse
 from app.services.detection_result_service import DetectionResultService
 
 router = APIRouter(prefix="/detection-results", tags=["Detection Results"])
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/detection-results", tags=["Detection Results"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedResponse[DetectionResultOut])
 async def list_detection_results(
     keyword: str | None = Query(None),
     page: int = Query(default=1, ge=1),
@@ -31,7 +32,7 @@ async def list_detection_results(
     )
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=SuccessResponse[DetectionResultOut])
 async def get_detection_result(
     id: str,
     user_id: str = Depends(get_current_user_id),
@@ -43,7 +44,7 @@ async def get_detection_result(
     return success_response(data=result)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[DetectionResultOut])
 async def create_detection_result(
     data: DetectionResultCreate,
     user_id: str = Depends(get_current_user_id),
@@ -55,7 +56,7 @@ async def create_detection_result(
     return success_response(data=result, message="Detection result created", status_code=201)
 
 
-@router.put("/{id}")
+@router.put("/{id}", response_model=SuccessResponse[DetectionResultOut])
 async def update_detection_result(
     id: str,
     data: DetectionResultUpdate,
@@ -68,7 +69,7 @@ async def update_detection_result(
     return success_response(data=result, message="Detection result updated")
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=MessageResponse)
 async def delete_detection_result(
     id: str,
     user_id: str = Depends(get_current_user_id),

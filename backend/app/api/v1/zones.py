@@ -7,7 +7,8 @@ from app.core.dependencies import RoleChecker, get_current_user_id
 from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.models import UserRole
-from app.schemas import ZoneCreate, ZoneUpdate
+from app.schemas import ZoneCreate, ZoneOut, ZoneUpdate
+from app.schemas.response_models import MessageResponse, PaginatedResponse, SuccessResponse
 from app.services import ZoneService
 
 router = APIRouter(prefix="/zones", tags=["Zones"])
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/zones", tags=["Zones"])
 allow_all = RoleChecker([r.value for r in UserRole])
 
 
-@router.get("")
+@router.get("", response_model=PaginatedResponse[ZoneOut])
 async def list_zones(
     farm_id: str | None = Query(None),
     keyword: str | None = Query(None),
@@ -32,7 +33,7 @@ async def list_zones(
     )
 
 
-@router.get("/{zone_id}")
+@router.get("/{zone_id}", response_model=SuccessResponse[ZoneOut])
 async def get_zone(
     zone_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -44,7 +45,7 @@ async def get_zone(
     return success_response(data=zone)
 
 
-@router.post("")
+@router.post("", response_model=SuccessResponse[ZoneOut])
 async def create_zone(
     data: ZoneCreate,
     user_id: str = Depends(get_current_user_id),
@@ -56,7 +57,7 @@ async def create_zone(
     return success_response(data=zone, message="Zone created", status_code=201)
 
 
-@router.put("/{zone_id}")
+@router.put("/{zone_id}", response_model=SuccessResponse[ZoneOut])
 async def update_zone(
     zone_id: str,
     data: ZoneUpdate,
@@ -69,7 +70,7 @@ async def update_zone(
     return success_response(data=zone, message="Zone updated")
 
 
-@router.delete("/{zone_id}")
+@router.delete("/{zone_id}", response_model=MessageResponse)
 async def delete_zone(
     zone_id: str,
     user_id: str = Depends(get_current_user_id),

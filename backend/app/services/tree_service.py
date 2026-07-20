@@ -9,6 +9,7 @@ from app.repositories import (
     DiseaseRepository,
     TreeRepository,
 )
+from app.repositories.zone_repository import ZoneRepository
 from app.schemas import TreeCreate, TreeUpdate
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class TreeService:
         self.db = db
         self.repo = TreeRepository(db)
         self.disease_repo = DiseaseRepository(db)
+        self.zone_repo = ZoneRepository(db)
 
     async def list_trees(
         self,
@@ -50,13 +52,13 @@ class TreeService:
         from datetime import datetime, time
 
         zone_oid = ObjectId(data.zone_id) if ObjectId.is_valid(data.zone_id) else ObjectId()
-        
-        # Lookup zone to get farm_id
-        zone_doc = await self.db["zones"].find_one({"_id": zone_oid})
-        if not zone_doc:
+
+        # Get farm_id from zone via repository
+        farm_id_str = await self.zone_repo.get_farm_id(data.zone_id)
+        if not farm_id_str:
             raise NotFoundException("Zone not found")
-        farm_oid = zone_doc["farm_id"]
-        
+        farm_oid = ObjectId(farm_id_str)
+
         planting_dt = None
         if data.planting_date:
             planting_dt = datetime.combine(data.planting_date, time.min)
@@ -85,7 +87,7 @@ class TreeService:
     async def update_tree(self, tree_id: str, data: TreeUpdate) -> dict:
         from bson import ObjectId
         from datetime import datetime, time
-        
+
         update_data = {}
         if data.tree_code is not None:
             update_data["tree_code"] = data.tree_code
@@ -99,17 +101,16 @@ class TreeService:
             update_data["gps_lat"] = float(data.gps_lat)
         if data.gps_lng is not None:
             update_data["gps_lng"] = float(data.gps_lng)
-            
+
         if data.planting_date is not None:
             update_data["planting_date"] = datetime.combine(data.planting_date, time.min) if data.planting_date else None
-            
+
         if hasattr(data, 'zone_id') and data.zone_id is not None:
-            zone_oid = ObjectId(data.zone_id) if ObjectId.is_valid(data.zone_id) else ObjectId()
-            zone_doc = await self.db["zones"].find_one({"_id": zone_oid})
-            if not zone_doc:
+            farm_id_str = await self.zone_repo.get_farm_id(data.zone_id)
+            if not farm_id_str:
                 raise NotFoundException("Zone not found")
-            update_data["zone_id"] = zone_oid
-            update_data["farm_id"] = zone_doc["farm_id"]
+            update_data["zone_id"] = ObjectId(data.zone_id)
+            update_data["farm_id"] = ObjectId(farm_id_str)
 
         tree = await self.repo.update(tree_id, update_data)
         if not tree:

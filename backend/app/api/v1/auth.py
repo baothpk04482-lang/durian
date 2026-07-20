@@ -9,16 +9,19 @@ from app.core.response import success_response
 from app.database.mongodb import get_database
 from app.schemas import (
     ChangePassword,
+    TokenOut,
     TokenRefresh,
     UserLogin,
     UserProfileUpdate,
+    UserOut,
     UserRegister,
 )
+from app.schemas.response_models import MessageResponse, SuccessResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/register")
+@router.post("/register", response_model=SuccessResponse[UserOut])
 async def register(
     data: UserRegister,
     db: AsyncIOMotorDatabase = Depends(get_database),
@@ -32,7 +35,7 @@ async def register(
     )
 
 
-@router.post("/login")
+@router.post("/login", response_model=SuccessResponse[TokenOut])
 async def login(
     data: UserLogin,
     db: AsyncIOMotorDatabase = Depends(get_database),
@@ -45,7 +48,7 @@ async def login(
     )
 
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=SuccessResponse[TokenOut])
 async def refresh(
     data: TokenRefresh,
     db: AsyncIOMotorDatabase = Depends(get_database),
@@ -58,7 +61,7 @@ async def refresh(
     )
 
 
-@router.get("/me")
+@router.get("/me", response_model=SuccessResponse[UserOut])
 async def get_me(
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
@@ -68,7 +71,7 @@ async def get_me(
     return success_response(data=result.model_dump())
 
 
-@router.put("/profile")
+@router.put("/profile", response_model=SuccessResponse[UserOut])
 async def update_profile(
     data: UserProfileUpdate,
     user_id: str = Depends(get_current_user_id),
@@ -82,7 +85,7 @@ async def update_profile(
     )
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=MessageResponse)
 async def logout(
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
@@ -92,7 +95,7 @@ async def logout(
     return success_response(message="Logged out successfully")
 
 
-@router.put("/change-password")
+@router.put("/change-password", response_model=MessageResponse)
 async def change_password(
     data: ChangePassword,
     user_id: str = Depends(get_current_user_id),

@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.exceptions import NotFoundException, BadRequestException
 from app.repositories.disease_history_repository import DiseaseHistoryRepository
+from app.repositories.tree_repository import TreeRepository
 from app.schemas.disease_history import DiseaseHistoryCreate, DiseaseHistoryUpdate
 
 logger = logging.getLogger(__name__)
@@ -24,12 +25,10 @@ class DiseaseHistoryService:
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self.db = db
         self.repo = DiseaseHistoryRepository(db)
+        self.tree_repo = TreeRepository(db)
 
     async def _validate_tree(self, tree_id: str) -> None:
-        if not ObjectId.is_valid(tree_id):
-            raise BadRequestException("Invalid tree_id format")
-        tree = await self.db["trees"].find_one({"_id": ObjectId(tree_id)})
-        if not tree:
+        if not await self.tree_repo.exists_by_id(tree_id):
             raise BadRequestException(f"Tree with ID '{tree_id}' does not exist")
 
     async def list_disease_history(
